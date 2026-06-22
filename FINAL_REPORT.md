@@ -59,9 +59,8 @@ It summarizes the private feature branch, the validation result, and the publish
 10. 원본 feature 최종 commit SHA
 `9feef98b7f3a2ed92f988ccfe42a7d1b0cf51728`
 
-11. 공개 review repo 반영 상태
-- report, prompt, and supporting review docs were committed and pushed to the public review repository
-- public repo was clean immediately after push
+11. 공개 review repo commit SHA
+`3a899e011d3b90785f892a503ec0ff0e4aae297d`
 
 12. 두 repo의 clean 상태
 - private repo: clean
