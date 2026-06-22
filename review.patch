@@ -109,10 +109,10 @@ index 0049b67..7a805b1 100644
 +  4. 생성된 브리핑 요약본 및 리포트 파일들을 지정된 텔레그램 봇 채널로 정상 발송 완료.
 diff --git a/briefing_logic_v2.py b/briefing_logic_v2.py
 new file mode 100644
-index 0000000..046f8bb
+index 0000000..81a0135
 --- /dev/null
 +++ b/briefing_logic_v2.py
-@@ -0,0 +1,546 @@
+@@ -0,0 +1,578 @@
 +"""Canonical selection policy shared by VCS briefing outputs.
 +
 +This module intentionally contains no network or delivery code.  It turns already
@@ -146,6 +146,16 @@ index 0000000..046f8bb
 +GENERIC_BUSINESS_TOKENS = {
 +    "and", "for", "the", "technology", "technologies", "services", "solutions",
 +    "software", "systems", "industrial", "industrials", "business", "company",
++}
++APPROVED_EARNINGS_SOURCES = {
++    "official",
++    "provisional",
++    "preliminary",
++    "dart_filing_date",
++    "dart_provisional_fair_disclosure",
++    "sec_filing_date",
++    "공식",
++    "잠정",
 +}
 +
 +
@@ -215,6 +225,13 @@ index 0000000..046f8bb
 +    return None
 +
 +
++def _normalized_source_type(value: object) -> str:
++    text = _clean(value).lower()
++    text = text.replace("-", "_").replace(" ", "_")
++    text = re.sub(r"_+", "_", text)
++    return text.strip("_")
++
++
 +def _tokens(value: object) -> set[str]:
 +    return {
 +        token
@@ -253,6 +270,20 @@ index 0000000..046f8bb
 +    return evidence
 +
 +
++def _customer_only_business_context(text: str) -> bool:
++    patterns = (
++        r"\bservices?\s+to\b",
++        r"\bcustomers?\s+include\b",
++        r"\bconsulting to\b",
++        r"\blogistics for\b",
++        r"\binsurance products for\b",
++        r"\bserves?\b.*\b(?:manufacturers?|makers?|operators?|companies?|customers?)\b",
++        r"\bprovides?\b.*\b(?:services?|solutions?|products?)\s+for\b",
++        r"\bprovider[s]?\s+to\b",
++    )
++    return any(re.search(pattern, text) for pattern in patterns)
++
++
 +def classify_business_directness(row: pd.Series, leadership: pd.DataFrame) -> BusinessMatch:
 +    """Match real business evidence only against sectors that are currently leading."""
 +    if leadership is None or leadership.empty or "sector" not in leadership.columns:
@@ -275,6 +306,7 @@ index 0000000..046f8bb
 +    primary_evidence = _canonical_evidence(primary_text)
 +    auxiliary_tokens = _tokens(auxiliary_text)
 +    auxiliary_evidence = _canonical_evidence(auxiliary_text)
++    description_customer_only = _customer_only_business_context(primary_description)
 +    generic_overlap_seen = False
 +
 +    best: tuple[int, float, BusinessMatch] | None = None
@@ -289,7 +321,7 @@ index 0000000..046f8bb
 +
 +        sector_tokens = _tokens(sector_lower)
 +        exact_structured = bool(sector_tokens) and all(token in primary_structured for token in sector_tokens)
-+        canonical_match = bool(canonical & primary_evidence)
++        canonical_match = bool(canonical & primary_evidence) and not description_customer_only
 +        specific_overlap = leader_tokens & primary_tokens
 +        auxiliary_match = bool(canonical & auxiliary_evidence) or bool(leader_tokens & auxiliary_tokens)
 +        generic_overlap_seen = generic_overlap_seen or bool(_tokens(sector) & primary_tokens)
@@ -336,10 +368,10 @@ index 0000000..046f8bb
 +    as_of = as_of.tz_localize("UTC") if as_of.tzinfo is None else as_of.tz_convert("UTC")
 +    quarter = _clean(_first(row, ("earnings_quarter", "announced_quarter", "earnings_quarter_end", "quarter_end", "latest_quarter")))
 +    release_raw = _first(row, ("earnings_release_date", "release_date", "announced_release_date"))
-+    source = _clean(_first(row, ("earnings_source_type", "earnings_release_source", "release_source", "earnings_basis"))).lower()
++    source = _normalized_source_type(_first(row, ("earnings_source_type", "earnings_release_source", "release_source", "earnings_basis")))
 +    release = pd.to_datetime(release_raw, errors="coerce", utc=True)
 +    age_days = None if pd.isna(release) else int((as_of - release).days)
-+    source_verified = any(term in source for term in ("official", "provisional", "preliminary", "dart", "sec", "공식", "잠정"))
++    source_verified = source in APPROVED_EARNINGS_SOURCES
 +
 +    quarter_match = re.fullmatch(r"(\d{4})\s*[- ]?Q([1-4])", quarter, flags=re.IGNORECASE)
 +    if quarter_match:
@@ -1548,10 +1580,10 @@ index 7dab558..7e67d50 100644
 +If this policy changes again, update `docs/briefing_logic_v2.md` and the selection tests first, then refresh the automation notes.
 diff --git a/docs/briefing_logic_v2.md b/docs/briefing_logic_v2.md
 new file mode 100644
-index 0000000..6d0ce62
+index 0000000..dd926c8
 --- /dev/null
 +++ b/docs/briefing_logic_v2.md
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,111 @@
 +# Briefing Selection Logic v2
 +
 +## Fixed decision flow
@@ -1590,24 +1622,25 @@ index 0000000..6d0ce62
 +
 +The scanner automatically prefers a newer `*_daily_current.txt` over the legacy dated default path. This task does not register or modify cron.
 +
-+The weekly refresh requires explicit source provenance before liquidity processing. KR requires successful KOSPI and KOSDAQ sources. US requires successful NASDAQ, NYSE, and NYSE American sources. A missing or failed required source rejects the entire market refresh; symbol-count heuristics cannot convert a partial fetch into a valid snapshot.
++The weekly refresh requires explicit source provenance before liquidity processing. KR requires successful KOSPI and KOSDAQ sources. US requires successful NASDAQ, NYSE, and NYSE American sources. A missing or failed required source rejects the entire market refresh; symbol-count heuristics cannot convert a partial fetch into a valid snapshot. Snapshot metadata is validated row by row. `market`, `universe_scope`, `universe_refreshed_at`, `universe_symbol_count`, `liquid_symbol_count`, `liquidity_coverage_pct`, `universe_required_sources`, `universe_source_status`, `universe_required_source_count`, and `universe_successful_source_count` must be non-null, stripped, and identical across every row. `symbol` must be non-null, non-empty, stripped, and unique. Partial rows, blank metadata, or mixed metadata invalidate the snapshot and force `candidate_fallback_not_full_market`.
 +
 +Fresh cache validation is shared by KR and US and requires all of the following:
 +
 +- non-empty CSV and complete snapshot schema
++- every required metadata field present on every row
 +- `universe_scope == weekly_liquid_full_market`
 +- one parseable, non-future `universe_refreshed_at`
 +- timestamp within the configured freshness window
 +- internally consistent universe/liquid counts and coverage percentage
 +- complete required-source list and successful source-status metadata
 +
-+Missing, malformed, future, expired, or internally inconsistent metadata is never labeled fresh. Valid snapshots older than the fresh window may be used only as `stale_cached_market_context`; malformed or expired snapshots fall back to candidate context and cannot produce practical recommendations.
++Missing, malformed, future, expired, blank, or internally inconsistent metadata is never labeled fresh. Valid snapshots older than the fresh window may be used only as `stale_cached_market_context`; malformed, partial, or expired snapshots fall back to candidate context and cannot produce practical recommendations.
 +
 +Publishing is transactional at the snapshot-set level. Dated CSV, current CSV, and daily watchlist are staged and validated before replacement. Publish order is dated, watchlist, then current; current is the final commit marker. Any intermediate failure restores the prior current/watchlist generation and cleans temporary files. A failed KR refresh never overwrites the US cache, and vice versa.
 +
 +## Business directness
 +
-+`business_directness` is one of `direct`, `adjacent`, `peripheral`, or `unrelated`. A company can be `direct` only when primary evidence (structured `industry`/business tags or a concrete business description) matches a sector present in the current leadership result. `theme_hint`, generic sector names, and derived theme labels are auxiliary evidence only and cannot independently produce `direct`. Generic words such as `software`, `technology`, or `solutions` are not direct AI evidence. Ambiguous and auxiliary-only matches set `needs_sector_review=True` and remain observation-only.
++`business_directness` is one of `direct`, `adjacent`, `peripheral`, or `unrelated`. A company can be `direct` only when structured `industry`/business tags clearly match a current leader, or when the business description itself describes the company’s own product, technology, or service in that sector. Customer-only phrasing such as `serves semiconductor manufacturers`, `customers include semiconductor companies`, `logistics for chip makers`, `insurance products for data-center operators`, or `consulting to semiconductor companies` does not qualify as direct. `theme_hint`, generic sector names, and derived theme labels are auxiliary evidence only and cannot independently produce `direct`. Generic words such as `software`, `technology`, or `solutions` are not direct AI evidence. Ambiguous and auxiliary-only matches set `needs_sector_review=True` and remain observation-only.
 +
 +The practical gate also requires `leadership_universe_scope == weekly_liquid_full_market_fresh` and `sector_leadership_score >= 60`. Stale cached context and candidate fallback stay in observation mode even if the business match itself looks strong.
 +
@@ -1632,7 +1665,7 @@ index 0000000..6d0ce62
 +- `loss_narrowing`
 +- `distorted_or_missing`
 +
-+Missing, stale, future-dated or non-verifiable data fails closed. The quarter must parse, must not end after the release date, and must be plausibly linked to that release. The release source must be official or provisional. Release timestamps are compared to `as_of` without day-level truncation; a later timestamp on the same date is still future. A future release retains its date and negative age for diagnostics but is `distorted_or_missing` with `earnings_verified=False`. When both one-year and three-year OPM are negative, improvement is `loss_narrowing`, not profitable expansion.
++Missing, stale, future-dated or non-verifiable data fails closed. The quarter must parse, must not end after the release date, and must be plausibly linked to that release. The release source must be one of the explicit allowlist values: `official`, `provisional`, `preliminary`, `dart_filing_date`, `dart_provisional_fair_disclosure`, `sec_filing_date`, `공식`, or `잠정`. Release timestamps are compared to `as_of` without day-level truncation; a later timestamp on the same date is still future. A future release retains its date and negative age for diagnostics but is `distorted_or_missing` with `earnings_verified=False`. Any source outside the exact allowlist, including substring lookalikes such as `unofficial`, `secondary estimate`, or `unofficial preliminary data`, fails closed. When both one-year and three-year OPM are negative, improvement is `loss_narrowing`, not profitable expansion.
 +
 +## Recommendation gate and score
 +
@@ -1661,13 +1694,13 @@ index 0000000..6d0ce62
 +
 +Build summaries and TradingView files directly in a temporary directory. Do not invoke Telegram `sendMessage`/`sendDocument` or rclone during logic rehearsals. The production automation, cron entries and delivery credentials are outside this logic change.
 +
-+The frozen positive fixture verifies three practical symbols in identical Markdown, Telegram, and TradingView order, disjoint observation output, and no observation backfill when practical count is zero.
++The frozen positive fixture verifies three practical symbols in identical Markdown, Telegram, and TradingView order, disjoint observation output, and no observation backfill when practical count is zero. A builder-level fixture also exercises `scripts/build_market_briefing.py` against real temporary files to confirm the same selector order reaches Markdown, Telegram Top, and TradingView main outputs. The current regression set reaches the real file I/O path and the full suite contains 55 tests.
 diff --git a/docs/reviews/20260619_v2/DRY_RUN_EVIDENCE.md b/docs/reviews/20260619_v2/DRY_RUN_EVIDENCE.md
 new file mode 100644
-index 0000000..e2c96d4
+index 0000000..1c9b176
 --- /dev/null
 +++ b/docs/reviews/20260619_v2/DRY_RUN_EVIDENCE.md
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,82 @@
 +# Dry Run Evidence
 +
 +## Scope
@@ -1719,6 +1752,20 @@ index 0000000..e2c96d4
 +| Telegram Top | `MTSI`, `SMTC`, `LSCC` |
 +| TradingView main upload | `MTSI`, `SMTC`, `LSCC` |
 +
++## Builder-Level Positive Fixture
++
++The `test_builder_level_fresh_positive_fixture_keeps_order_and_disjoint_outputs` fixture goes through the real builder path with temporary on-disk files.
++
++Observed properties:
++
++- fresh leadership scope is preserved
++- verified earnings and direct business evidence survive through the builder
++- the same practical symbol order reaches Markdown, Telegram Top, and TradingView main output
++- practical and observation TradingView sets remain disjoint
++- builder output does not backfill observations when the practical set is empty
++
++This gives file-I/O evidence for the canonical selector path without invoking Telegram or Google Drive delivery.
++
 +Observation fixtures include high-risk biotech and below-EMA21 RS cases. The TradingView practical/observation intersection is empty. The separate zero-practical fixture confirms Telegram emits only the no-practical message and does not promote observations.
 +
 +## Negative E2E Boundaries
@@ -1731,19 +1778,20 @@ index 0000000..e2c96d4
 +- Publish failure between watchlist and current: rollback restores the old generation.
 +- Future earnings release: unverified `distorted_or_missing`.
 +- Theme-only semiconductor hint: review-only, not direct.
++- Customer-only business phrasing: review-only, not direct.
 +
 +## Remaining Production Limitation
 +
 +A real fresh weekly universe and live positive KR/US/both production run are still unverified because the bounded upstream refresh did not complete. The frozen fixture proves the deterministic positive code path; it does not substitute for live provider availability or data-quality validation.
 diff --git a/docs/reviews/20260619_v2/REVIEW_BUNDLE.md b/docs/reviews/20260619_v2/REVIEW_BUNDLE.md
 new file mode 100644
-index 0000000..ea6ca61
+index 0000000..3f888e2
 --- /dev/null
 +++ b/docs/reviews/20260619_v2/REVIEW_BUNDLE.md
 @@ -0,0 +1,221 @@
 +# VCS Screener V2 Review Bundle
 +
-+Date: 2026-06-19
++Date: 2026-06-22
 +
 +## Review Context
 +
@@ -1776,7 +1824,7 @@ index 0000000..ea6ca61
 +
 +- Branch: `fix/briefing-logic-v2`
 +- Base commit: `107103b7520437ab9bacd4c76ed669feaa93f613`
-+- Final-remediation starting tip: `58a2ecf3b53726abb673bfa948fa8f90d3266d7c`
++- Final-remediation starting tip: `43e0696a32f8968125d8afb58a8d37bbde9c0614`
 +
 +## Scope
 +
@@ -1787,7 +1835,7 @@ index 0000000..ea6ca61
 +
 +| File | Role |
 +| --- | --- |
-+| `briefing_logic_v2.py` | Canonical hard-gate policy, score composition, business directness, and fail-closed recommendation selection. |
++| `briefing_logic_v2.py` | Canonical hard-gate policy, score composition, exact earnings-source allowlist, business directness, and fail-closed recommendation selection. |
 +| `candidate_enrichment_v2.py` | Adds earnings, RS, and leadership-scope enrichment fields consumed by the canonical selector. |
 +| `scripts/refresh_weekly_universe.py` | Safely refreshes weekly liquid universes and daily watchlists without overwriting good cache on failure. |
 +| `scripts/run_daily_briefing.sh` | Orchestrates KR/US/both execution paths and keeps market-specific file names, Telegram, and upload packaging aligned. |
@@ -1798,7 +1846,7 @@ index 0000000..ea6ca61
 +| `scripts/build_telegram_summary.py` | Emits Telegram summaries from the same canonical practical selector. |
 +| `tests/test_briefing_logic_v2.py` | Unit and pipeline-contract coverage for the V2 selection contract. |
 +| `tests/test_weekly_universe_refresh.py` | Cache-preservation tests for weekly refresh failures and low-coverage cases. |
-+| `weekly_universe_cache.py` | Shared strict weekly snapshot schema, freshness, count/coverage, and source-provenance validation. |
++| `weekly_universe_cache.py` | Shared strict weekly snapshot schema, freshness, row-level metadata consistency, count/coverage, and source-provenance validation. |
 +| `tests/test_weekly_universe_cache.py` | Missing/malformed/future/stale metadata and KR title regression coverage. |
 +| `docs/briefing_logic_v2.md` | Selection-policy documentation and operational notes. |
 +| `docs/automation.md` | Run-mode and cron documentation, including the VCS threshold wording fix. |
@@ -1938,10 +1986,10 @@ index 0000000..ea6ca61
 +- QTTB / RLYB style biotech names are observation-only.
 +- RS unknown or below EMA21 is practical-fail closed.
 +- The weekly refresh no longer overwrites a good cache on DNS / fetch failures or low-coverage refreshes.
-+- Missing, malformed, future, wrong-scope, count-inconsistent, or source-incomplete weekly metadata can no longer be labeled fresh.
++- Missing, malformed, future, wrong-scope, count-inconsistent, partially null, or source-incomplete weekly metadata can no longer be labeled fresh.
 +- Partial KOSPI/KOSDAQ or US core-exchange refreshes cannot replace the current cache.
 +- Snapshot publish failure between watchlist and current replacement rolls back the whole generation.
-+- Future earnings releases fail closed, and theme-only labels cannot independently create direct business classification.
++- Future earnings releases fail closed, exact source-type allowlisting rejects substring lookalikes, and customer-only theme labels cannot independently create direct business classification.
 +- KR fresh scope now renders the full-market title using the canonical fresh constant.
 +- The VCS threshold wording is now consistent at 45.
 +- Windows-only `install.cmd` is removed from the Linux server review path.
@@ -1950,7 +1998,7 @@ index 0000000..ea6ca61
 +
 +- Fresh production weekly universe refresh is not yet validated on live network data in this workspace.
 +- Current local state still has no weekly current cache, so the present dry-run is fail-closed and practical count is 0.
-+- Positive-path practical recommendations and cross-output ordering are covered by a frozen E2E fixture, but not by a live fresh-cache production run in this workspace.
++- Positive-path practical recommendations and cross-output ordering are covered by a frozen E2E fixture and a builder-level fixture using real temporary files, but not by a live fresh-cache production run in this workspace.
 +
 +## Main Merge Checklist
 +
@@ -1964,10 +2012,10 @@ index 0000000..ea6ca61
 +6. Confirm `review.patch` is up to date.
 diff --git a/docs/reviews/20260619_v2/TEST_EVIDENCE.md b/docs/reviews/20260619_v2/TEST_EVIDENCE.md
 new file mode 100644
-index 0000000..ff62519
+index 0000000..57a3a68
 --- /dev/null
 +++ b/docs/reviews/20260619_v2/TEST_EVIDENCE.md
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,102 @@
 +# Test Evidence
 +
 +## Final Review Remediation Run
@@ -1977,11 +2025,11 @@ index 0000000..ff62519
 +```bash
 +.venv/bin/python -m unittest discover -s tests -v
 +bash -n scripts/run_daily_briefing.sh
-+.venv/bin/python -m py_compile briefing_logic_v2.py candidate_enrichment_v2.py scripts/refresh_weekly_universe.py kr_market_sector_leadership.py us_sector_leadership.py weekly_universe_cache.py full_market_scan.py
-+git diff --check
++.venv/bin/python -m py_compile briefing_logic_v2.py candidate_enrichment_v2.py weekly_universe_cache.py scripts/refresh_weekly_universe.py full_market_scan.py kr_market_sector_leadership.py us_sector_leadership.py scripts/build_market_briefing.py scripts/build_telegram_summary.py scripts/build_tradingview_watchlists.py
++git diff --check origin/main...HEAD
 +```
 +
-+Current result: 44 tests passed. Bash syntax, Python compilation, and diff whitespace checks passed. Final verification is rerun immediately before commit.
++Current result: 55 tests passed. Bash syntax, Python compilation, and diff whitespace checks passed. Final verification is rerun immediately before commit.
 +
 +## Test Inventory
 +
@@ -1991,10 +2039,16 @@ index 0000000..ff62519
 +- `test_ebay_and_dbd_are_not_ai_direct_from_software_word`
 +- `test_mtsi_is_direct_when_semiconductors_are_actually_leading`
 +- `test_theme_hint_semiconductor_alone_is_not_direct`
++- `test_semiconductor_customer_mention_is_not_direct`
++- `test_data_center_customer_mention_is_not_ai_direct`
++- `test_logistics_for_chipmakers_requires_review`
 +- `test_future_release_date_fails_closed`
 +- `test_same_day_future_release_time_fails_closed`
 +- `test_quarter_after_release_date_fails_closed`
 +- `test_missing_or_stale_earnings_fail_closed`
++- `test_unofficial_earnings_source_fails_closed`
++- `test_secondary_estimate_source_fails_closed`
++- `test_exact_official_and_provisional_sources_pass`
 +- `test_two_negative_opm_periods_are_loss_narrowing`
 +
 +### Recommendation, market, and output contracts
@@ -2014,6 +2068,7 @@ index 0000000..ff62519
 +- `test_verified_direct_candidate_can_pass_end_to_end`
 +- `test_main_and_observation_tv_files_are_disjoint`
 +- `test_fresh_positive_fixture_has_identical_markdown_telegram_and_tv_order`
++- `test_builder_level_fresh_positive_fixture_keeps_order_and_disjoint_outputs`
 +- `test_zero_practical_candidates_do_not_backfill_telegram_top`
 +
 +### Weekly cache validation
@@ -2022,6 +2077,10 @@ index 0000000..ff62519
 +- `test_unparseable_timestamp_is_not_fresh`
 +- `test_future_timestamp_is_not_fresh`
 +- `test_wrong_universe_scope_is_not_fresh`
++- `test_partial_null_market_row_is_not_fresh`
++- `test_partial_blank_scope_row_is_not_fresh`
++- `test_partial_null_snapshot_metadata_is_not_fresh`
++- `test_inconsistent_snapshot_metadata_across_rows_is_not_fresh`
 +- `test_empty_weekly_csv_is_not_fresh`
 +- `test_invalid_count_or_source_metadata_is_not_fresh`
 +- `test_invalid_coverage_metadata_is_not_fresh`
@@ -2044,12 +2103,15 @@ index 0000000..ff62519
 +## Boundary Evidence
 +
 +- Timestamp missing, malformed, future, wrong-scope, empty, count-inconsistent, and source-incomplete snapshots reject fresh scope.
++- Partially null or row-inconsistent snapshot metadata also reject fresh scope.
 +- The valid fresh fixture is accepted by both KR and US leadership resolvers.
 +- KR KOSPI-only and US missing-NYSE-American provenance stop before liquidity processing and preserve existing operational files.
 +- An injected failure after watchlist replacement but before current replacement restores both prior files, removes the new dated snapshot, and leaves no `.tmp` files.
-+- `theme_hint=반도체` alone is review-only, while the MTSI structured semiconductor path remains direct.
++- `theme_hint=반도체` alone is review-only, customer-only industry phrases are not direct, while the MTSI structured semiconductor path remains direct.
 +- Future earnings, including a later timestamp on the same UTC date, are `distorted_or_missing`, unverified, and retain a negative age for diagnostics.
++- Exact source allowlisting rejects lookalikes such as `unofficial` and `secondary estimate`.
 +- Frozen practical symbols `MTSI`, `SMTC`, `LSCC` appear in identical Markdown, Telegram, and TV-main order. Observation symbols are disjoint, and zero practical rows do not backfill Telegram Top.
++- Builder-level fixture coverage uses real temporary files and the same canonical selector reaches Markdown, Telegram, and TradingView main outputs.
 +
 +## Network Attempt
 +
@@ -3371,17 +3433,19 @@ index 0000000..9cf7bae
 +"""Regression tests for the VCS briefing pipeline."""
 diff --git a/tests/test_briefing_logic_v2.py b/tests/test_briefing_logic_v2.py
 new file mode 100644
-index 0000000..6c91825
+index 0000000..acfa826
 --- /dev/null
 +++ b/tests/test_briefing_logic_v2.py
-@@ -0,0 +1,496 @@
+@@ -0,0 +1,787 @@
 +from __future__ import annotations
 +
 +import re
 +import unittest
 +from pathlib import Path
 +from tempfile import TemporaryDirectory
++from types import SimpleNamespace
 +
++import numpy as np
 +import pandas as pd
 +
 +from briefing_logic_v2 import (
@@ -3394,6 +3458,8 @@ index 0000000..6c91825
 +)
 +from candidate_enrichment_v2 import benchmark_for_symbol, prepare_candidates
 +from full_market_scan import resolve_watchlist_path
++from scripts.build_market_briefing import write_us_briefing
++from scripts.build_telegram_summary import build_summary as build_telegram_summary_text
 +from scripts.build_tradingview_watchlists import write_observation_files, write_practical_files
 +from scripts.build_telegram_summary import top_candidates
 +from build_whole_market_briefings import us_stock_line
@@ -3430,7 +3496,13 @@ index 0000000..6c91825
 +        "close": 105.0,
 +        "ma50": 100.0,
 +        "ma50_gap_pct": 5.0,
++        "high_52w": 120.0,
++        "low_52w": 70.0,
 +        "below_52w_high_pct": -8.0,
++        "quarter_revenue_yoy": 18.0,
++        "quarter_op_income_yoy": 14.0,
++        "annual_revenue_yoy": 20.0,
++        "annual_op_income_yoy": 15.0,
 +        "atrp14": 3.0,
 +        "average_dollar_volume_20d": 20_000_000.0,
 +        "is_biotech_or_high_risk": False,
@@ -3526,6 +3598,51 @@ index 0000000..6c91825
 +        self.assertNotEqual(result.business_directness, "direct")
 +        self.assertTrue(result.needs_sector_review)
 +
++    def test_semiconductor_customer_mention_is_not_direct(self) -> None:
++        result = classify_business_directness(
++            pd.Series(
++                {
++                    "symbol": "LOGI",
++                    "sector": "Industrials",
++                    "industry": "Logistics",
++                    "business_summary": "Provides logistics services to semiconductor manufacturers.",
++                }
++            ),
++            self.leadership,
++        )
++        self.assertNotEqual(result.business_directness, "direct")
++        self.assertTrue(result.needs_sector_review)
++
++    def test_data_center_customer_mention_is_not_ai_direct(self) -> None:
++        result = classify_business_directness(
++            pd.Series(
++                {
++                    "symbol": "INSR",
++                    "sector": "Financials",
++                    "industry": "Insurance",
++                    "business_summary": "Provides insurance products for data-center operators.",
++                }
++            ),
++            self.leadership,
++        )
++        self.assertNotEqual(result.business_directness, "direct")
++        self.assertTrue(result.needs_sector_review)
++
++    def test_logistics_for_chipmakers_requires_review(self) -> None:
++        result = classify_business_directness(
++            pd.Series(
++                {
++                    "symbol": "SHIP",
++                    "sector": "Industrials",
++                    "industry": "Logistics",
++                    "business_summary": "Logistics for chip makers and semiconductor manufacturers.",
++                }
++            ),
++            self.leadership,
++        )
++        self.assertIn(result.business_directness, {"peripheral", "unrelated", "adjacent"})
++        self.assertTrue(result.needs_sector_review)
++
 +
 +class EarningsQualityTests(unittest.TestCase):
 +    def test_two_negative_opm_periods_are_loss_narrowing(self) -> None:
@@ -3566,6 +3683,73 @@ index 0000000..6c91825
 +        self.assertFalse(missing.verified)
 +        self.assertEqual(stale.quality, "distorted_or_missing")
 +        self.assertFalse(stale.verified)
++
++    def test_unofficial_earnings_source_fails_closed(self) -> None:
++        result = classify_earnings_quality(
++            pd.Series(
++                {
++                    "earnings_quarter": "2026Q1",
++                    "earnings_release_date": "2026-05-10",
++                    "earnings_source_type": "unofficial",
++                    "revenue_current": 100.0,
++                    "opm_latest_q": 18.0,
++                    "opm_roll4q": 16.0,
++                    "opm_roll12q": 12.0,
++                }
++            ),
++            as_of=pd.Timestamp("2026-06-19"),
++        )
++        self.assertEqual(result.quality, "distorted_or_missing")
++        self.assertFalse(result.verified)
++        self.assertIn("source", result.reason)
++
++    def test_secondary_estimate_source_fails_closed(self) -> None:
++        result = classify_earnings_quality(
++            pd.Series(
++                {
++                    "earnings_quarter": "2026Q1",
++                    "earnings_release_date": "2026-05-10",
++                    "earnings_source_type": "secondary estimate",
++                    "revenue_current": 100.0,
++                    "opm_latest_q": 18.0,
++                    "opm_roll4q": 16.0,
++                    "opm_roll12q": 12.0,
++                }
++            ),
++            as_of=pd.Timestamp("2026-06-19"),
++        )
++        self.assertEqual(result.quality, "distorted_or_missing")
++        self.assertFalse(result.verified)
++
++    def test_exact_official_and_provisional_sources_pass(self) -> None:
++        allowed_sources = [
++            "official",
++            "provisional",
++            "preliminary",
++            "dart_filing_date",
++            "dart_provisional_fair_disclosure",
++            "sec_filing_date",
++            "공식",
++            "잠정",
++        ]
++        for source in allowed_sources:
++            with self.subTest(source=source):
++                result = classify_earnings_quality(
++                    pd.Series(
++                        {
++                            "earnings_quarter": "2026Q1",
++                            "earnings_release_date": "2026-05-10",
++                            "earnings_source_type": source,
++                            "revenue_current": 100.0,
++                            "opm_latest_q": 18.0,
++                            "opm_roll4q": 16.0,
++                            "opm_roll12q": 12.0,
++                        }
++                    ),
++                    as_of=pd.Timestamp("2026-06-19"),
++                )
++                self.assertNotEqual(result.quality, "distorted_or_missing")
++                self.assertTrue(result.verified)
 +
 +    def test_future_release_date_fails_closed(self) -> None:
 +        result = classify_earnings_quality(
@@ -3853,6 +4037,175 @@ index 0000000..6c91825
 +        self.assertEqual(tv_symbols, expected)
 +        self.assertFalse(set(tv_symbols) & set(observation_symbols))
 +
++    def test_builder_level_fresh_positive_fixture_keeps_order_and_disjoint_outputs(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            sector_csv = root / "us_sector.csv"
++            stocks_csv = root / "us_stocks.csv"
++            output_md = root / "us_briefing.md"
++            telegram_md = root / "us_telegram_summary.txt"
++            tv_upload = root / "us_tv_upload.txt"
++            tv_upload_comma = root / "us_tv_upload_comma.txt"
++            tv_sections = root / "us_tv_sections.txt"
++            tv_observation = root / "us_tv_observation.txt"
++            tv_observation_sections = root / "us_tv_observation_sections.txt"
++            observation_md = root / "us_observation.txt"
++
++            sector_frame = pd.DataFrame(
++                [
++                    {
++                        "sector": "Semiconductors",
++                        "leadership_score": 88.0,
++                        "leadership_grade": "주도",
++                        "vcs_candidate_status": "confirmed",
++                        "leadership_universe_scope": "weekly_liquid_full_market_fresh",
++                        "leaders": "MTSI, SMTC, LSCC",
++                    }
++                ]
++            )
++            sector_frame.to_csv(sector_csv, index=False, encoding="utf-8-sig")
++
++            stocks_frame = pd.DataFrame(
++                [
++                    candidate(
++                        symbol="MTSI",
++                        stock_name="MACOM",
++                        industry="Semiconductors",
++                        business_summary="Designs RF and optical semiconductors for data centers.",
++                        earnings_quarter="2026Q1",
++                        earnings_release_date="2026-05-10",
++                        earnings_source_type="official",
++                        revenue_current=100.0,
++                        opm_latest_q=18.0,
++                        opm_roll4q=16.0,
++                        opm_roll12q=12.0,
++                        rs_score=95.0,
++                        rs_above_ma=True,
++                        recommend_score=94.0,
++                        vcs_score=82.0,
++                    ),
++                    candidate(
++                        symbol="SMTC",
++                        stock_name="Semtech",
++                        industry="Semiconductors",
++                        business_summary="Designs connectivity semiconductors and optical products.",
++                        earnings_quarter="2026Q1",
++                        earnings_release_date="2026-05-11",
++                        earnings_source_type="official",
++                        revenue_current=100.0,
++                        opm_latest_q=17.0,
++                        opm_roll4q=15.0,
++                        opm_roll12q=11.0,
++                        rs_score=92.0,
++                        rs_above_ma=True,
++                        recommend_score=91.0,
++                        vcs_score=80.0,
++                    ),
++                    candidate(
++                        symbol="LSCC",
++                        stock_name="Lattice",
++                        industry="Semiconductors",
++                        business_summary="Designs low-power programmable semiconductors.",
++                        earnings_quarter="2026Q1",
++                        earnings_release_date="2026-05-12",
++                        earnings_source_type="official",
++                        revenue_current=100.0,
++                        opm_latest_q=15.0,
++                        opm_roll4q=13.0,
++                        opm_roll12q=10.0,
++                        rs_score=90.0,
++                        rs_above_ma=True,
++                        recommend_score=88.0,
++                        vcs_score=78.0,
++                    ),
++                    candidate(
++                        symbol="QTTB",
++                        stock_name="Q32 Bio",
++                        industry="Biotechnology",
++                        business_summary="Clinical-stage biotechnology company.",
++                        earnings_quarter="2026Q1",
++                        earnings_release_date="2026-05-13",
++                        earnings_source_type="official",
++                        revenue_current=100.0,
++                        opm_latest_q=-12.0,
++                        opm_roll4q=-10.0,
++                        opm_roll12q=-8.0,
++                        rs_score=60.0,
++                        rs_above_ma=False,
++                        recommend_score=np.nan,
++                        vcs_score=55.0,
++                    ),
++                    candidate(
++                        symbol="BELOW",
++                        stock_name="Below RS",
++                        industry="Semiconductors",
++                        business_summary="Designs semiconductor equipment.",
++                        earnings_quarter="2026Q1",
++                        earnings_release_date="2026-05-14",
++                        earnings_source_type="official",
++                        revenue_current=100.0,
++                        opm_latest_q=14.0,
++                        opm_roll4q=12.0,
++                        opm_roll12q=9.0,
++                        rs_score=62.0,
++                        rs_above_ma=False,
++                        recommend_score=np.nan,
++                        vcs_score=70.0,
++                    ),
++                ]
++            )
++            stocks_frame.to_csv(stocks_csv, index=False, encoding="utf-8-sig")
++
++            args = SimpleNamespace(
++                market="us",
++                stocks_csv=stocks_csv,
++                sector_csv=sector_csv,
++                theme_sector_csv=None,
++                detail_sector_csv=None,
++                output_md=output_md,
++                prefix="0622",
++                origin="CODEX",
++                top_n=5,
++                scan_scope="daily watchlist 기반 실행",
++                skip_rs_enrichment=True,
++            )
++
++            write_us_briefing(args)
++
++            write_practical_files(stocks_csv, lambda symbol: symbol, tv_upload, tv_upload_comma, tv_sections)
++            write_observation_files(stocks_csv, lambda symbol: symbol, tv_observation, tv_observation_sections)
++
++            summary_args = SimpleNamespace(
++                run_date="2026-06-22",
++                origin="CODEX",
++                market="us",
++                title="",
++                final_md=output_md,
++                kr_earnings_csv=None,
++                us_earnings_csv=stocks_csv,
++                kr_all_csv=None,
++                us_all_csv=stocks_csv,
++                kr_sector_csv=None,
++                us_sector_csv=sector_csv,
++                output=telegram_md,
++                scan_scope="daily watchlist 기반 실행",
++            )
++            telegram_text = build_telegram_summary_text(summary_args)
++            telegram_md.write_text(telegram_text, encoding="utf-8")
++
++            md_text = output_md.read_text(encoding="utf-8-sig")
++            md_order = [m.group(1) for m in re.finditer(r"\*\*([A-Z0-9]+)\s", md_text)]
++            telegram_section = telegram_text.split("US 추천 Top 5", 1)[1]
++            telegram_section = telegram_section.split("US 관찰 후보", 1)[0]
++            telegram_order = [m.group(1) for m in re.finditer(r"\d+\.\s+[^()]+\(([^)]+)\)", telegram_section)]
++            tv_order = tv_upload.read_text(encoding="utf-8").splitlines()
++            observation_order = tv_observation.read_text(encoding="utf-8").splitlines()
++
++            self.assertEqual(md_order[:3], ["MTSI", "SMTC", "LSCC"])
++            self.assertEqual(tv_order, ["MTSI", "SMTC", "LSCC"])
++            self.assertEqual(telegram_order[:3], ["MTSI", "SMTC", "LSCC"])
++            self.assertFalse(set(tv_order) & set(observation_order))
++
 +    def test_zero_practical_candidates_do_not_backfill_telegram_top(self) -> None:
 +        frame = enrich_recommendations(
 +            pd.DataFrame(
@@ -3873,10 +4226,10 @@ index 0000000..6c91825
 +    unittest.main()
 diff --git a/tests/test_weekly_universe_cache.py b/tests/test_weekly_universe_cache.py
 new file mode 100644
-index 0000000..c3caeb0
+index 0000000..8c379db
 --- /dev/null
 +++ b/tests/test_weekly_universe_cache.py
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,207 @@
 +from __future__ import annotations
 +
 +import json
@@ -3916,6 +4269,18 @@ index 0000000..c3caeb0
 +            "universe_successful_source_count": [len(required)] * 2,
 +        }
 +    )
++
++
++def partial_snapshot(
++    market: str,
++    *,
++    row2_overrides: dict[str, object] | None = None,
++) -> pd.DataFrame:
++    frame = valid_snapshot(market)
++    overrides = row2_overrides or {}
++    for column, value in overrides.items():
++        frame.loc[1, column] = value
++    return frame
 +
 +
 +@contextmanager
@@ -3972,6 +4337,30 @@ index 0000000..c3caeb0
 +            with self.subTest(market=market):
 +                frame = valid_snapshot(market)
 +                frame["universe_scope"] = "candidate_fallback_not_full_market"
++                self.assert_falls_back(module, market, frame)
++
++    def test_partial_null_market_row_is_not_fresh(self) -> None:
++        for module, market in ((kr_leadership, "KR"), (us_leadership, "US")):
++            with self.subTest(market=market):
++                frame = partial_snapshot(market, row2_overrides={"market": None})
++                self.assert_falls_back(module, market, frame)
++
++    def test_partial_blank_scope_row_is_not_fresh(self) -> None:
++        for module, market in ((kr_leadership, "KR"), (us_leadership, "US")):
++            with self.subTest(market=market):
++                frame = partial_snapshot(market, row2_overrides={"universe_scope": " "})
++                self.assert_falls_back(module, market, frame)
++
++    def test_partial_null_snapshot_metadata_is_not_fresh(self) -> None:
++        for module, market in ((kr_leadership, "KR"), (us_leadership, "US")):
++            with self.subTest(market=market):
++                frame = partial_snapshot(market, row2_overrides={"liquidity_coverage_pct": None})
++                self.assert_falls_back(module, market, frame)
++
++    def test_inconsistent_snapshot_metadata_across_rows_is_not_fresh(self) -> None:
++        for module, market in ((kr_leadership, "KR"), (us_leadership, "US")):
++            with self.subTest(market=market):
++                frame = partial_snapshot(market, row2_overrides={"universe_symbol_count": 99})
 +                self.assert_falls_back(module, market, frame)
 +
 +    def test_empty_weekly_csv_is_not_fresh(self) -> None:
@@ -4506,10 +4895,10 @@ index caa7cfb..c6137cd 100644
      print(f"members_csv={members_csv}")
 diff --git a/weekly_universe_cache.py b/weekly_universe_cache.py
 new file mode 100644
-index 0000000..46c6aa8
+index 0000000..57a47fa
 --- /dev/null
 +++ b/weekly_universe_cache.py
-@@ -0,0 +1,215 @@
+@@ -0,0 +1,223 @@
 +"""Strict validation contracts for weekly leadership-universe snapshots."""
 +from __future__ import annotations
 +
@@ -4563,10 +4952,16 @@ index 0000000..46c6aa8
 +
 +
 +def _single_value(frame: pd.DataFrame, column: str) -> object:
-+    values = frame[column].dropna().astype(str).str.strip().unique().tolist()
-+    if len(values) != 1 or not values[0]:
++    series = frame[column]
++    if series.isna().any():
++        raise ValueError(f"{column} must contain one non-empty value in every row")
++    values = series.astype(str).map(str.strip).tolist()
++    if any(not value for value in values):
++        raise ValueError(f"{column} must contain one non-empty value in every row")
++    unique = pd.Series(values, dtype="object").unique().tolist()
++    if len(unique) != 1:
 +        raise ValueError(f"{column} must contain one non-empty value")
-+    return values[0]
++    return unique[0]
 +
 +
 +def _positive_int(value: object, label: str) -> int:
@@ -4655,25 +5050,27 @@ index 0000000..46c6aa8
 +        return SnapshotAssessment("invalid", WEEKLY_FALLBACK_SCOPE, f"snapshot schema missing: {', '.join(missing)}")
 +
 +    try:
-+        markets = set(frame["market"].dropna().astype(str).str.upper().str.strip())
-+        if markets != {market}:
-+            raise ValueError(f"market rows mismatch: {sorted(markets)}")
-+        scopes = set(frame["universe_scope"].dropna().astype(str).str.strip())
-+        if scopes != {WEEKLY_FULL_MARKET_SCOPE}:
++        market_value = str(_single_value(frame, "market")).upper()
++        if market_value != market:
++            raise ValueError(f"market rows mismatch: {market_value}")
++        scope_value = str(_single_value(frame, "universe_scope"))
++        if scope_value != WEEKLY_FULL_MARKET_SCOPE:
 +            raise ValueError(f"universe_scope must be {WEEKLY_FULL_MARKET_SCOPE}")
-+        symbols = frame["symbol"].dropna().astype(str).str.strip()
-+        symbols = symbols[symbols.ne("")]
++        symbols = frame["symbol"].astype(str).str.strip()
++        if frame["symbol"].isna().any() or symbols.eq("").any():
++            raise ValueError("symbol rows must be non-empty and unique")
 +        unique_symbols = int(symbols.nunique())
 +        if unique_symbols <= 0 or unique_symbols != len(frame):
 +            raise ValueError("symbol rows must be non-empty and unique")
 +
++        refreshed_text = str(_single_value(frame, "universe_refreshed_at"))
 +        timestamps = pd.to_datetime(
-+            frame["universe_refreshed_at"],
++            pd.Series([refreshed_text]),
 +            errors="coerce",
 +            utc=True,
 +            format="mixed",
 +        )
-+        if timestamps.isna().any() or timestamps.nunique() != 1:
++        if timestamps.isna().any():
 +            raise ValueError("universe_refreshed_at must contain one parseable timestamp")
 +        refreshed = timestamps.iloc[0]
 +        current = pd.Timestamp(now or datetime.now(timezone.utc))
