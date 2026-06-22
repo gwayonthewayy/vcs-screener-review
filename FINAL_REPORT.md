@@ -60,7 +60,7 @@ It summarizes the private feature branch, the validation result, and the publish
 `9feef98b7f3a2ed92f988ccfe42a7d1b0cf51728`
 
 11. 공개 review repo commit SHA
-`3a899e011d3b90785f892a503ec0ff0e4aae297d`
+`07158e61f30d014a9c7f4af6cf06b7cb5409c8b8`
 
 12. 두 repo의 clean 상태
 - private repo: clean
