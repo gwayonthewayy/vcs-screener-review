@@ -1,0 +1,3725 @@
+diff --git a/.gitignore b/.gitignore
+index b6a8646..d7a1467 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -8,6 +8,10 @@ env/
+ 
+ results/
+ logs/
++universes/*_liquid_*.csv
++universes/*_cache.csv
++watchlists/kr_daily_current.txt
++watchlists/us_daily_current.txt
+ .env
+ 
+ .pytest_cache/
+@@ -19,3 +23,4 @@ logs/
+ 
+ .DS_Store
+ Thumbs.db
++scratch/
+diff --git a/ANTIGRAVITY_HANDOFF.md b/ANTIGRAVITY_HANDOFF.md
+index 3ccb67a..437b6a1 100644
+--- a/ANTIGRAVITY_HANDOFF.md
++++ b/ANTIGRAVITY_HANDOFF.md
+@@ -1,39 +1,28 @@
+-# 🚀 ANTIGRAVITY_HANDOFF (2026-04-29)
++# 🚀 ANTIGRAVITY_HANDOFF (2026-06-19)
+ 
+-이 파일은 **VCS Screener** 프로젝트의 현재 상태와 맥락을 다음 에이전트에게 전달하기 위한 공식 핸드오프 문서입니다.
++이 파일은 **VCS Screener** 프로젝트의 현재 상태와 맥락을 다음 에이전트(서버 Codex)에게 전달하기 위한 공식 핸드오프 문서입니다.
+ 
+ ## 📍 현재 작업 환경 (Paths)
+-- **코드 저장소:** `D:\VCS screener`
+-- **데이터 결과 폴더:** `D:\VCS results` (Git 관리 제외)
+-- **주요 기록:** `WORKLOG.md` (상세 작업 로그)
++- **코드 저장소:** `/home/gyu123/projects/vcs-screener` (Linux 서버 환경)
++- **주요 기록:** `WORKLOG.md` (상세 작업 로그), `scratch/` (백업 및 임시 작업 폴더)
+ 
+ ## ✅ 최종 작업 상태 (Current Status)
+-- **2026-04-29 국장(KR) 스캔 완료:** `deep-minervini` 프로필 기반으로 전 종목 스캔을 마쳤습니다.
+-- **VCS 60+ 통합 워치리스트 생성:** 변동성 수축 점수가 60점 이상인 종목들을 선별하여 섹터 리더십 및 미싱 바스켓 분석을 완료했습니다.
+-- **주요 결과물:**
+-    - `0429_국장_주도섹터랭킹.md`: 섹터별 강세 순위 및 주도주 리스트.
+-    - `0429_국장_신규바스켓후보.md`: 기존 바스켓에 포함되지 않은 유망 종목군 제안.
+-    - `0429_국장_미너비니심화.csv/xlsx`: 전체 스캔 결과 데이터.
+-
+-## 💡 중요 기술 가이드 (Technical Notes)
+-
+-### 1. '순수 VCS' vs '시장 강세 점수'의 차이
+-- **TradingView Pine Script 기반 VCS:** 단순히 캔들의 고가/저가 범위를 계산하여 변동성 수축 정도만을 측정합니다.
+-- **본 에이전트의 점수 체계:** 
+-    - `vcs_score`: 수축도뿐만 아니라, **상승 추세 정렬(Moving Average Alignment)** 및 **상대적 강도(RS)**를 가중치로 포함합니다.
+-    - 따라서 트뷰에서는 수축이 예뻐 보여도, 장기 이평선 아래에 있거나 시장 대비 약하면 점수가 낮게 나올 수 있습니다.
+-
+-### 2. 오판 방지 사례: 삼성E&A (028050.KS)
+-- **케이스:** 삼성E&A는 최근 강력한 추세를 보이며 상승했으나, 과거 `vcs_score`가 기준치(60)에 미달하는 경우가 발생했습니다.
+-- **원인:** 추세는 강하지만(강세주), 아직 가격 조정을 거치며 에너지를 응축하는 '수축 구간'이 짧거나 변동성이 충분히 줄어들지 않았기 때문입니다.
+-- **가이드:** 점수가 낮다고 해서 나쁜 주식은 아니나, **"VCS 돌파 매매"** 관점에서는 아직 진입 타점이 아님을 의미합니다. 추세 추종과 변동성 수축을 엄격히 구분하십시오.
++1. **브리핑 선정 로직 V2 통합 완료 (`fix/briefing-logic-v2` 브랜치)**:
++   - 로컬에서 테스트하던 브리핑 선정 로직(Market → Sector → Business Directness → VCS/Chart → Earnings/OPM → RS → Risk/Entry → Score)을 서버의 Production 환경에 완벽히 이식했습니다.
++   - `briefing_logic_v2.py` 및 `candidate_enrichment_v2.py`를 생성하고 `scripts/run_daily_briefing.sh` 실행 경로 상에 연동했습니다.
++2. **DNS/네트워크 이슈 대응 (Weekly Universe Fallback)**:
++   - `scripts/refresh_weekly_universe.py`의 잦은 DNS 에러를 우회하기 위해 캐시 시스템을 구현했습니다.
++   - 10일 이내의 유니버스는 `weekly_liquid_full_market_fresh`로 마킹하여 정상 사용.
++   - 10~21일 사이의 유니버스는 `stale_cached_market_context`로 표시하여 경고와 함께 사용.
++   - 21일이 넘어가는 경우 또는 파일이 없으면 기존처럼 폴백 로직을 타되 `candidate_fallback_not_full_market` 마킹.
++   - `build_market_briefing.py` 및 `build_whole_market_briefings.py`의 마크다운 텍스트 템플릿도 유니버스 상태에 맞추어 헤더가 동적으로 변환되도록 수정했습니다.
+ 
+ ## 🚀 다음 단계 (Next Steps)
+-1. **미국장(US) 스캔 실행:** 
+-   - `full_market_scan.py`를 사용하여 미국장 deep-minervini 스캔을 수행하십시오.
+-   - 기본 VCS 기준은 `--min-score 40`으로 낮췄으며, 필요시 `--allow-below-ma50-pct 10` 옵션을 검토하십시오.
+-2. **신규 바스켓 업데이트 (`sector_baskets.py`):**
+-   - `0429_국장_신규바스켓후보_sector_basket_snippet.py`에 생성된 신규 섹터(소프트웨어, 의류, 자동차 부품 등)를 `sector_baskets.py`에 병합하여 추적 범위를 넓히십시오.
++- **서버 Codex (You)의 후속 자동화 작업:**
++  이제 핵심 브리핑 로직과 예외 처리(Fallback)가 준비되었으므로, 다음 자동화 태스크를 계속 이어서 진행해주십시오.
++  1. 자동 생성된 브리핑 마크다운과 엑셀 리포트(results 디렉토리 산출물)를 지정된 구글 드라이브(또는 노션/웹사이트)로 자동 업로드.
++  2. 텔레그램 봇 메세지 연동 (요약 브리핑 및 산출물 링크 발송).
++  3. 전체 파이프라인(스크리닝 -> 브리핑 -> 업로드 -> 텔레그램 전송)을 서버의 Cron 스케줄에 맞춰 원활히 돌아가도록 환경 구성.
+ 
+ ---
+-**"전임자가 여기까지 완료했습니다. 이제 바통을 이어받아 미국장 승전보를 울려주세요!"**
++**"핵심 분석 로직과 엣지 케이스 대응을 마무리했습니다. 이제 바통을 이어받아 알림/업로드 파이프라인 자동화를 마무리해주세요!"**
+diff --git a/WORKLOG.md b/WORKLOG.md
+index 0049b67..7a805b1 100644
+--- a/WORKLOG.md
++++ b/WORKLOG.md
+@@ -401,3 +401,21 @@ Verification:
+ 
+ - `건설/인프라`: `deep_pass_count=7`, `earnings_good_count=5`, grade `강한 순환`.
+ - `unclassified_건설` no longer appears in `0429_국장_신규바스켓후보_members.csv`.
++
++
++## 2026-06-19: 브리핑 로직 V2 이식 및 DNS 예외처리 (Server Environment)
++- **작업자:** Antigravity (Codex Handoff Preparation)
++- **주요 내용:**
++  1. `briefing_logic_v2.py`, `candidate_enrichment_v2.py` 코드 생성 및 로컬 로직 서버 이식 완료.
++  2. `tests/test_briefing_logic_v2.py` 단위 테스트 통과 및 V2 로직 검증 완료.
++  3. `scripts/refresh_weekly_universe.py` DNS/네트워크 장애 대비 fallback 로직 구현 (`universe_refreshed_at` 기반 10일/21일 freshness 캐시 확인).
++  4. `build_whole_market_briefings.py`, `scripts/build_market_briefing.py`에 캐시/fallback 유무에 따른 마크다운 헤더 분기 추가.
++  5. 모든 작업 내용 `fix/briefing-logic-v2` 브랜치에 커밋/푸시 및 `ANTIGRAVITY_HANDOFF.md` 업데이트 완료.
++
++## 2026-06-19: 데일리 브리핑 V2 파이프라인 리허설 실행 완료
++- **작업자:** Antigravity (Current CLI Session)
++- **주요 내용:**
++  1. 사용자 요청에 따른 수동 리허설 실행 (`TZ=Asia/Seoul /bin/bash scripts/run_daily_briefing.sh`).
++  2. 구글 드라이브 업로드는 비활성화 (`ENABLE_GDRIVE_UPLOAD=0`)하여 실행.
++  3. KR/US 전체 시장 스캔, 실질 테마 및 리더십 산출, V2 로직에 따른 실전 브리핑 마크다운/DOCX 리포트 생성 완료.
++  4. 생성된 브리핑 요약본 및 리포트 파일들을 지정된 텔레그램 봇 채널로 정상 발송 완료.
+diff --git a/briefing_logic_v2.py b/briefing_logic_v2.py
+new file mode 100644
+index 0000000..8ed66b9
+--- /dev/null
++++ b/briefing_logic_v2.py
+@@ -0,0 +1,506 @@
++"""Canonical selection policy shared by VCS briefing outputs.
++
++This module intentionally contains no network or delivery code.  It turns already
++collected market, sector, fundamentals, chart and RS data into deterministic
++selection fields used by markdown, Telegram and TradingView exporters.
++"""
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import Mapping, Sequence
++import re
++
++import numpy as np
++import pandas as pd
++
++
++DIRECTNESS_POINTS = {"direct": 10.0, "adjacent": 6.0, "peripheral": 2.0, "unrelated": 0.0}
++EARNINGS_POINTS = {
++    "profitable_expansion": 20.0,
++    "profitable_slowdown": 14.0,
++    "turnaround_positive": 12.0,
++    "loss_narrowing": 5.0,
++    "distorted_or_missing": 0.0,
++}
++PRACTICAL_EARNINGS = {"profitable_expansion", "profitable_slowdown", "turnaround_positive"}
++FRESH_LEADERSHIP_SCOPE = "weekly_liquid_full_market_fresh"
++BIOTECH_PATTERN = re.compile(
++    r"\b(?:biotech(?:nology)?|therapeutics?|clinical[- ]stage|drug development|oncology|rare disease)\b|바이오텍|신약",
++    re.IGNORECASE,
++)
++GENERIC_BUSINESS_TOKENS = {
++    "and", "for", "the", "technology", "technologies", "services", "solutions",
++    "software", "systems", "industrial", "industrials", "business", "company",
++}
++
++
++@dataclass(frozen=True)
++class RecommendationPolicy:
++    min_vcs: float = 45.0
++    min_sector_leadership_score: float = 60.0
++    max_below_ma50_pct: float = 10.0
++    max_ma50_extension_pct: float = 20.0
++    max_earnings_age_days: int = 180
++    max_atrp: float = 9.0
++    fresh_leadership_scopes: tuple[str, ...] = (FRESH_LEADERSHIP_SCOPE,)
++
++
++@dataclass(frozen=True)
++class BusinessMatch:
++    business_directness: str
++    matched_lead_sector: str
++    sector_leadership_score: float | None
++    needs_sector_review: bool
++    match_reason: str
++
++
++@dataclass(frozen=True)
++class EarningsAssessment:
++    quality: str
++    verified: bool
++    quarter: str
++    release_date: str
++    source_type: str
++    age_days: int | None
++    reason: str
++
++
++@dataclass(frozen=True)
++class MarketExposure:
++    signal: str
++    score: float
++    exposure_multiplier: float
++    reasons: tuple[str, ...]
++
++
++def _clean(value: object) -> str:
++    if value is None or (isinstance(value, float) and pd.isna(value)):
++        return ""
++    return " ".join(str(value).split())
++
++
++def _number(value: object) -> float | None:
++    try:
++        number = float(value)
++    except (TypeError, ValueError):
++        return None
++    return None if pd.isna(number) else number
++
++
++def _boolean(value: object) -> bool | None:
++    if value is None or (isinstance(value, float) and pd.isna(value)):
++        return None
++    if isinstance(value, (bool, np.bool_)):
++        return bool(value)
++    text = str(value).strip().lower()
++    if text in {"true", "1", "yes", "y", "t"}:
++        return True
++    if text in {"false", "0", "no", "n", "f"}:
++        return False
++    return None
++
++
++def _tokens(value: object) -> set[str]:
++    return {
++        token
++        for token in re.findall(r"[a-z0-9가-힣]+", _clean(value).replace("_", " ").replace("/", " ").lower())
++        if len(token) > 2 and token not in GENERIC_BUSINESS_TOKENS
++    }
++
++
++def _business_text(row: pd.Series) -> str:
++    fields = [
++        "sector", "sector_detail", "sector_theme_group", "industry", "business_summary",
++        "longBusinessSummary", "business_description", "description", "theme_hint", "business_tags",
++    ]
++    return " ".join(_clean(row.get(field)) for field in fields if _clean(row.get(field))).lower()
++
++
++def _canonical_evidence(text: str) -> set[str]:
++    evidence: set[str] = set()
++    rules: dict[str, Sequence[str]] = {
++        "semiconductors": ("semiconductor", "chip design", "rf chip", "hbm", "반도체", "웨이퍼", "파운드리"),
++        "ai infrastructure": ("ai accelerator", "gpu server", "data center networking", "artificial intelligence infrastructure", "ai infrastructure", "ai 인프라"),
++        "software": ("saas", "cloud software", "enterprise software", "cybersecurity", "application software"),
++        "shipbuilding": ("shipbuilding", "shipyard", "조선", "선박", "특수선"),
++        "power infrastructure": ("transformer", "power grid", "switchgear", "전력기기", "변압기", "전력망"),
++        "biotechnology": ("biotech", "biotechnology", "therapeutics", "clinical-stage", "바이오텍", "신약"),
++    }
++    for label, phrases in rules.items():
++        if any(phrase in text for phrase in phrases):
++            evidence.add(label)
++    return evidence
++
++
++def classify_business_directness(row: pd.Series, leadership: pd.DataFrame) -> BusinessMatch:
++    """Match real business evidence only against sectors that are currently leading."""
++    if leadership is None or leadership.empty or "sector" not in leadership.columns:
++        return BusinessMatch("unrelated", "", None, True, "sector leadership unavailable")
++
++    leaders = leadership.copy()
++    leaders["leadership_score"] = pd.to_numeric(leaders.get("leadership_score"), errors="coerce")
++    leaders = leaders.dropna(subset=["leadership_score"]).sort_values("leadership_score", ascending=False)
++    if leaders.empty:
++        return BusinessMatch("unrelated", "", None, True, "sector leadership score unavailable")
++
++    business_text = _business_text(row)
++    business_tokens = _tokens(business_text)
++    evidence = _canonical_evidence(business_text)
++    structured = " ".join(
++        _clean(row.get(field)).lower()
++        for field in ("sector", "sector_detail", "sector_theme_group", "industry", "business_tags")
++    )
++    generic_overlap_seen = False
++
++    best: tuple[int, float, BusinessMatch] | None = None
++    for _, leader in leaders.iterrows():
++        sector = _clean(leader.get("sector"))
++        if not sector:
++            continue
++        score = float(leader["leadership_score"])
++        sector_lower = sector.lower()
++        leader_tokens = _tokens(sector_lower)
++        canonical = _canonical_evidence(sector_lower)
++
++        sector_tokens = _tokens(sector_lower)
++        exact_structured = bool(sector_tokens) and all(token in structured for token in sector_tokens)
++        canonical_match = bool(canonical & evidence)
++        specific_overlap = leader_tokens & business_tokens
++        generic_overlap_seen = generic_overlap_seen or bool(_tokens(sector) & _tokens(business_text))
++
++        if exact_structured or canonical_match:
++            result = BusinessMatch("direct", sector, score, False, "structured industry/business evidence matches current leader")
++            rank = 4
++        elif len(specific_overlap) >= 2:
++            result = BusinessMatch("adjacent", sector, score, False, "multiple specific business terms overlap current leader")
++            rank = 3
++        elif specific_overlap:
++            result = BusinessMatch("peripheral", sector, score, True, "single business-term overlap needs review")
++            rank = 2
++        else:
++            continue
++        candidate = (rank, score, result)
++        if best is None or candidate[:2] > best[:2]:
++            best = candidate
++
++    if best is not None:
++        return best[2]
++    reason = "generic technology wording is not direct business evidence" if generic_overlap_seen or "technology" in business_text else "no business evidence matches a current leader"
++    return BusinessMatch("unrelated", "", None, True, reason)
++
++
++def _first(row: pd.Series, names: Sequence[str]) -> object:
++    for name in names:
++        value = row.get(name)
++        if value is not None and not (isinstance(value, float) and pd.isna(value)) and _clean(value):
++            return value
++    return None
++
++
++def classify_earnings_quality(
++    row: pd.Series,
++    *,
++    as_of: pd.Timestamp | None = None,
++    max_age_days: int = 180,
++) -> EarningsAssessment:
++    as_of = (as_of or pd.Timestamp.now()).normalize()
++    quarter = _clean(_first(row, ("earnings_quarter", "announced_quarter", "earnings_quarter_end", "quarter_end", "latest_quarter")))
++    release_raw = _first(row, ("earnings_release_date", "release_date", "announced_release_date"))
++    source = _clean(_first(row, ("earnings_source_type", "earnings_release_source", "release_source", "earnings_basis"))).lower()
++    release = pd.to_datetime(release_raw, errors="coerce")
++    age_days = None if pd.isna(release) else max(0, int((as_of - release.normalize()).days))
++    source_verified = any(term in source for term in ("official", "provisional", "preliminary", "dart", "sec", "공식", "잠정"))
++
++    revenue = _number(_first(row, ("revenue_current", "announced_revenue_current", "quarter_revenue")))
++    latest = _number(row.get("opm_latest_q"))
++    one_year = _number(row.get("opm_roll4q"))
++    three_year = _number(row.get("opm_roll12q"))
++    metadata_ok = bool(quarter and age_days is not None and age_days <= max_age_days and source_verified)
++    values_ok = revenue is not None and revenue > 0 and latest is not None and one_year is not None and three_year is not None
++    if not metadata_ok or not values_ok:
++        reason = "missing/stale release metadata" if not metadata_ok else "revenue or OPM missing/distorted"
++        return EarningsAssessment(
++            "distorted_or_missing", False, quarter, "" if pd.isna(release) else release.date().isoformat(),
++            source, age_days, reason,
++        )
++
++    if latest < 0 and one_year < 0 and three_year < 0:
++        quality = "loss_narrowing" if latest > one_year > three_year else "distorted_or_missing"
++    elif latest >= 0 and one_year <= 0:
++        quality = "turnaround_positive"
++    elif latest > 0 and one_year > 0 and three_year > 0 and latest >= one_year > three_year:
++        quality = "profitable_expansion"
++    elif latest > 0 and one_year > 0 and three_year > 0:
++        quality = "profitable_slowdown"
++    else:
++        quality = "distorted_or_missing"
++    verified = quality != "distorted_or_missing"
++    return EarningsAssessment(
++        quality, verified, quarter, release.date().isoformat(), source, age_days,
++        "latest reported quarter classified from revenue and OPM history",
++    )
++
++
++def _component_scores(row: pd.Series) -> dict[str, float]:
++    sector_score = _number(row.get("sector_leadership_score")) or 0.0
++    directness = _clean(row.get("business_directness")) or "unrelated"
++    earnings = _clean(row.get("earnings_quality")) or "distorted_or_missing"
++    latest_opm = _number(row.get("opm_latest_q"))
++    one_year_opm = _number(row.get("opm_roll4q"))
++    vcs = _number(row.get("vcs_score")) or 0.0
++    base = _clean(row.get("base_quality_label"))
++    rs = _number(row.get("rs_score")) or 0.0
++    ma_gap = _number(row.get("ma50_gap_pct"))
++    atrp = _number(row.get("atrp14"))
++    dollar_volume = _number(row.get("average_dollar_volume_20d"))
++
++    if latest_opm is None or one_year_opm is None:
++        opm_points = 0.0
++    elif latest_opm >= 20 and one_year_opm > 0:
++        opm_points = 15.0
++    elif latest_opm >= 10 and one_year_opm > 0:
++        opm_points = 12.0
++    elif latest_opm > 3 and one_year_opm > 0:
++        opm_points = 8.0
++    elif latest_opm >= 0:
++        opm_points = 4.0
++    else:
++        opm_points = 0.0
++
++    if ma_gap is None:
++        entry_points = 0.0
++    elif 0 <= ma_gap <= 8:
++        entry_points = 5.0
++    elif 8 < ma_gap <= 15:
++        entry_points = 3.0
++    elif -10 <= ma_gap < 0:
++        entry_points = 1.0
++    else:
++        entry_points = 0.0
++
++    liquidity_points = 0.0
++    if atrp is not None and atrp <= 6:
++        liquidity_points += 2.0
++    elif atrp is not None and atrp <= 9:
++        liquidity_points += 1.0
++    if dollar_volume is not None:
++        liquidity_points += 3.0 if dollar_volume >= 10_000_000 else 2.0 if dollar_volume >= 2_000_000 else 0.0
++    elif atrp is not None:
++        liquidity_points += 1.0
++
++    vcs_points = min(12.0, max(0.0, (vcs - 45.0) / 55.0 * 12.0))
++    base_points = {"tight": 3.0, "constructive": 2.0, "needs_chart_review": 1.0}.get(base, 0.0)
++
++    return {
++        "score_sector_leadership": min(15.0, max(0.0, sector_score) * 0.15),
++        "score_business_directness": DIRECTNESS_POINTS.get(directness, 0.0),
++        "score_earnings_quality": EARNINGS_POINTS.get(earnings, 0.0),
++        "score_opm_quality": min(15.0, opm_points),
++        "score_vcs_base": min(15.0, vcs_points + base_points),
++        "score_rs": min(15.0, max(0.0, rs) * 0.15),
++        "score_entry_position": entry_points,
++        "score_liquidity_risk": min(5.0, liquidity_points),
++    }
++
++
++def enrich_recommendations(
++    df: pd.DataFrame,
++    *,
++    policy: RecommendationPolicy | None = None,
++) -> pd.DataFrame:
++    policy = policy or RecommendationPolicy()
++    if df.empty:
++        return df.copy()
++
++    rows: list[dict[str, object]] = []
++    for _, source in df.iterrows():
++        row = source.copy()
++        text = _business_text(row) + " " + _clean(row.get("stock_name")).lower()
++        biotech = bool(BIOTECH_PATTERN.search(text))
++        business = _clean(row.get("business_directness")) or "unrelated"
++        needs_review = _boolean(row.get("needs_sector_review")) is not False
++        earnings = _clean(row.get("earnings_quality")) or "distorted_or_missing"
++        earnings_verified = _boolean(row.get("earnings_verified")) is True
++        vcs = _number(row.get("vcs_score"))
++        rs_score = _number(row.get("rs_score"))
++        rs_above = _boolean(row.get("rs_above_ma"))
++        ma_gap = _number(row.get("ma50_gap_pct"))
++        if ma_gap is None:
++            close = _number(row.get("close"))
++            ma50 = _number(row.get("ma50"))
++            ma_gap = (close / ma50 - 1.0) * 100.0 if close is not None and ma50 and ma50 > 0 else None
++        atrp = _number(row.get("atrp14"))
++        base = _clean(row.get("base_quality_label"))
++        opm_distorted = _boolean(row.get("is_loss_or_opm_distorted")) is True or earnings in {"loss_narrowing", "distorted_or_missing"}
++        leadership_scope = _clean(row.get("leadership_universe_scope")) or "unknown"
++        sector_score = _number(row.get("sector_leadership_score"))
++
++        failures: list[str] = []
++        if vcs is None or vcs < policy.min_vcs:
++            failures.append("VCS 게이트 미통과")
++        if leadership_scope not in policy.fresh_leadership_scopes:
++            failures.append(f"주도섹터 scope 미검증({leadership_scope})")
++        if sector_score is None:
++            failures.append("주도섹터 점수 미확인")
++        elif sector_score < policy.min_sector_leadership_score:
++            failures.append(
++                f"주도섹터 점수 미달({sector_score:.1f} < {policy.min_sector_leadership_score:.1f})"
++            )
++        if business not in {"direct", "adjacent"} or needs_review:
++            failures.append("사업 직접성 미검증")
++        if not earnings_verified or earnings not in PRACTICAL_EARNINGS:
++            failures.append("최신 실적 미검증")
++        if rs_score is None:
++            failures.append("RS미확인")
++        elif rs_above is not True:
++            failures.append("RS Line EMA21 하방")
++        if ma_gap is None:
++            failures.append("MA50 위치 미확인")
++        elif ma_gap < -policy.max_below_ma50_pct:
++            failures.append("MA50 하단 10% 초과")
++        elif ma_gap < 0:
++            failures.append("MA50 회복 대기")
++        elif ma_gap > policy.max_ma50_extension_pct:
++            failures.append("과도한 MA50 이격")
++        if base in {"extended", "volatile", "deep_or_loose", "weak_vcs"}:
++            failures.append("베이스/이격 리스크")
++        if atrp is not None and atrp > policy.max_atrp:
++            failures.append("변동성 과다")
++        if biotech:
++            failures.append("고위험 바이오텍")
++        if opm_distorted:
++            failures.append("OPM 왜곡/적자")
++
++        practical = not failures
++        scores = _component_scores(row)
++        observation_score = round(min(100.0, sum(scores.values())), 4)
++        immediate = practical and ma_gap is not None and ma_gap >= 0
++
++        if biotech:
++            bucket = "비주도/고위험 / 바이오텍"
++            stance = "관찰"
++        elif ma_gap is not None and -policy.max_below_ma50_pct <= ma_gap < 0:
++            bucket = "관찰 후보"
++            stance = "MA50 회복 대기"
++        elif practical:
++            bucket = "실전 추천 후보"
++            stance = "돌파 대기"
++        elif ma_gap is not None and ma_gap > policy.max_ma50_extension_pct:
++            bucket = "관찰 후보"
++            stance = "눌림 대기"
++        else:
++            bucket = "관찰 후보"
++            stance = "관찰"
++
++        result = row.to_dict()
++        result.update(scores)
++        result.update(
++            {
++                "ma50_gap_pct": ma_gap,
++                "is_biotech_or_high_risk": biotech,
++                "is_loss_or_opm_distorted": opm_distorted,
++                "is_rs_unconfirmed_or_weak": rs_score is None or rs_above is not True,
++                "is_extended_or_risky": ma_gap is None or ma_gap > policy.max_ma50_extension_pct or base in {"extended", "volatile"},
++                "is_practical_recommendation": practical,
++                "immediate_buy_ok": immediate,
++                "trade_stance": stance,
++                "recommend_bucket": bucket,
++                "recommend_reason": "실전 추천 하드 게이트 통과" if practical else ", ".join(dict.fromkeys(failures)),
++                "observation_score": observation_score,
++                "recommend_score": observation_score if practical else np.nan,
++                "recommend_score_method": "v2_gate_then_weighted_100",
++            }
++        )
++        rows.append(result)
++
++    out = pd.DataFrame(rows)
++    out["_practical_order"] = out["is_practical_recommendation"].astype(int)
++    out = out.sort_values(
++        ["_practical_order", "recommend_score", "observation_score", "vcs_score"],
++        ascending=[False, False, False, False], na_position="last",
++    ).drop(columns="_practical_order")
++    return out.reset_index(drop=True)
++
++
++def canonical_practical_candidates(df: pd.DataFrame, *, limit: int | None = None) -> pd.DataFrame:
++    required = {"is_practical_recommendation", "recommend_score"}
++    missing = sorted(required - set(df.columns))
++    if missing:
++        raise ValueError(f"candidate schema missing required practical fields: {', '.join(missing)}")
++    mask = df["is_practical_recommendation"].map(_boolean).eq(True)
++    out = df[mask].copy()
++    out["recommend_score"] = pd.to_numeric(out["recommend_score"], errors="coerce")
++    if out["recommend_score"].isna().any():
++        raise ValueError("practical candidate has missing recommend_score")
++    tie_breakers = [name for name in ("recommend_score", "vcs_score", "symbol") if name in out.columns]
++    ascending = [False if name != "symbol" else True for name in tie_breakers]
++    out = out.sort_values(tie_breakers, ascending=ascending, na_position="last")
++    if limit is not None:
++        out = out.head(limit)
++    return out.reset_index(drop=True)
++
++
++def _point_value(point: object, field: str) -> float | None:
++    if isinstance(point, Mapping):
++        return _number(point.get(field))
++    return _number(getattr(point, field, None))
++
++
++def assess_market_exposure(points: Mapping[str, object]) -> MarketExposure:
++    """Score only available market evidence; missing data is neutral."""
++    if not points:
++        return MarketExposure("데이터 부족", 0.0, 1.0, ("시장 데이터 N/A: 노출 중립 처리",))
++
++    score = 0.0
++    evidence = 0
++    reasons: list[str] = []
++    index_labels = ("KOSPI", "KOSDAQ", "S&P500 ETF", "Nasdaq100 ETF", "Semiconductor ETF")
++    for label in index_labels:
++        point = points.get(label)
++        if point is None:
++            continue
++        for field, weight, title in (("ma20_gap", 0.5, "MA20"), ("ma50_gap", 0.8, "MA50"), ("ma200_gap", 1.0, "MA200")):
++            value = _point_value(point, field)
++            if value is None:
++                continue
++            evidence += 1
++            score += weight if value >= 0 else -weight
++            reasons.append(f"{label} {title} {'상방' if value >= 0 else '하방'}({value:+.1f}%)")
++        for field, weight, title in (("pct_5d", 0.4, "5D"), ("pct_20d", 0.6, "20D")):
++            value = _point_value(point, field)
++            if value is None:
++                continue
++            evidence += 1
++            score += weight if value >= 0 else -weight
++            reasons.append(f"{label} {title} {value:+.1f}%")
++
++    vix = points.get("VIX")
++    vix_close = _point_value(vix, "close") if vix is not None else None
++    vix_change = _point_value(vix, "pct_5d") if vix is not None else None
++    if vix_close is not None:
++        evidence += 1
++        score += 0.8 if vix_close < 18 else 0.0 if vix_close < 23 else -1.0
++        reasons.append(f"VIX {vix_close:.1f}, 5D {vix_change:+.1f}%" if vix_change is not None else f"VIX {vix_close:.1f}")
++
++    fx = points.get("USDKRW")
++    fx_close = _point_value(fx, "close") if fx is not None else None
++    fx_change = _point_value(fx, "pct_20d") if fx is not None else None
++    if fx_close is not None:
++        evidence += 1
++        fx_penalty = -0.8 if fx_close >= 1450 else -0.3 if fx_close >= 1380 else 0.2
++        if fx_change is not None and fx_change > 2:
++            fx_penalty -= 0.4
++        score += fx_penalty
++        reasons.append(f"USDKRW {fx_close:.1f}, 20D {fx_change:+.1f}%" if fx_change is not None else f"USDKRW {fx_close:.1f}")
++
++    if evidence == 0:
++        return MarketExposure("데이터 부족", 0.0, 1.0, ("시장 데이터 N/A: 노출 중립 처리",))
++    if score >= 5:
++        signal, exposure = "공격 가능", 1.0
++    elif score >= 1:
++        signal, exposure = "선별 가능", 0.75
++    elif score > -2:
++        signal, exposure = "중립/확인", 0.55
++    else:
++        signal, exposure = "방어", 0.35
++    return MarketExposure(signal, round(score, 2), exposure, tuple(reasons))
+diff --git a/build_deep_minervini_briefing.py b/build_deep_minervini_briefing.py
+index 436a6b3..a06f0af 100644
+--- a/build_deep_minervini_briefing.py
++++ b/build_deep_minervini_briefing.py
+@@ -9,6 +9,8 @@ from typing import Iterable
+ 
+ import pandas as pd
+ 
++from briefing_logic_v2 import assess_market_exposure, canonical_practical_candidates, enrich_recommendations
++from candidate_enrichment_v2 import prepare_candidates
+ from kr_index_sources import NAVER_INDEX_SYMBOLS, naver_index_history
+ from minervini_overlay import add_minervini_overlay
+ 
+@@ -125,6 +127,21 @@ def load_sector_leadership(path: Path | None, results_dir: Path) -> pd.DataFrame
+     return df
+ 
+ 
++def load_market_sector_leadership(market: str, explicit: Path | None, results_dir: Path) -> pd.DataFrame:
++    if explicit is not None:
++        return load_sector_leadership(explicit, results_dir)
++    patterns = (
++        ["*_국장_*주도섹터랭킹.csv", "sector_leadership_*.csv"]
++        if market == "KR"
++        else ["*_미장_*주도섹터랭킹.csv", "us_sector_leadership_*.csv"]
++    )
++    try:
++        path = latest_file(patterns, results_dir)
++    except FileNotFoundError:
++        return pd.DataFrame()
++    return load_sector_leadership(path, results_dir)
++
++
+ def load_basket_suggestions(path: Path | None, results_dir: Path) -> pd.DataFrame:
+     if path is None:
+         try:
+@@ -216,111 +233,17 @@ def close_value(points: dict[str, MarketPoint], label: str) -> float | None:
+ 
+ 
+ def score_market(points: dict[str, MarketPoint], kr: pd.DataFrame, us: pd.DataFrame) -> tuple[str, list[str]]:
+-    score = 0.0
+-    reasons: list[str] = []
+-
+-    for label, weight in [("KOSPI", 1.5), ("KOSDAQ", 1.0), ("S&P500 ETF", 1.0), ("Nasdaq100 ETF", 1.0), ("Semiconductor ETF", 1.0), ("Korea ETF", 0.8)]:
+-        ma50_gap = gap_value(points, label, "ma50_gap")
+-        ma20_gap = gap_value(points, label, "ma20_gap")
+-        if ma50_gap is not None and ma50_gap > 0:
+-            score += weight
+-            reasons.append(f"{label} 50일선 위({pct(ma50_gap)})")
+-        elif ma20_gap is not None and ma20_gap > 0:
+-            score += weight * 0.5
+-            reasons.append(f"{label} 20일선 위지만 50일선 확인 필요({pct(ma20_gap)})")
+-        else:
+-            score -= weight * 0.5
+-            reasons.append(f"{label} 이평선 탄력 약함")
+-
+-    vix = close_value(points, "VIX")
+-    if vix is not None:
+-        if vix < 18:
+-            score += 1.0
+-            reasons.append(f"VIX 안정({vix:.1f})")
+-        elif vix < 23:
+-            score += 0.2
+-            reasons.append(f"VIX 중립({vix:.1f})")
+-        else:
+-            score -= 1.5
+-            reasons.append(f"VIX 부담({vix:.1f})")
+-
+-    usdkrw_20d = gap_value(points, "USDKRW", "pct_20d")
+-    if usdkrw_20d is not None:
+-        if usdkrw_20d < 1.5:
+-            score += 0.5
+-            reasons.append(f"원/달러 20일 변화 안정({pct(usdkrw_20d)})")
+-        else:
+-            score -= 0.8
+-            reasons.append(f"원/달러 상승 부담({pct(usdkrw_20d)})")
+-
+-    kr_leaders = int(kr["leadership_bucket"].isin(["주도 섹터 본류", "주도 섹터 일부"]).sum()) if not kr.empty else 0
+-    us_leaders = int(us["leadership_bucket"].isin(["주도 섹터 본류", "주도 섹터 일부"]).sum()) if not us.empty else 0
+-    if kr_leaders >= 5:
+-        score += 1.0
+-        reasons.append(f"국장 후보 내 주도 섹터 후보 {kr_leaders}개")
+-    elif kr_leaders:
+-        score += 0.4
+-        reasons.append(f"국장 후보 내 주도 섹터 후보 {kr_leaders}개로 선별 필요")
+-    if us_leaders >= 5:
+-        score += 0.8
+-        reasons.append(f"미장 후보 내 주도 섹터 후보 {us_leaders}개")
+-    elif us_leaders:
+-        score += 0.2
+-        reasons.append(f"미장 후보 내 주도 섹터 후보 {us_leaders}개로 좁음")
+-
+-    if score >= 6.0:
+-        grade = "공격 가능"
+-    elif score >= 3.5:
+-        grade = "선별 가능"
+-    elif score >= 1.0:
+-        grade = "눌림 대기"
+-    else:
+-        grade = "방어"
+-    return grade, reasons
++    assessment = assess_market_exposure(points)
++    reasons = [f"권장 총 노출 배수 {assessment.exposure_multiplier:.2f}", *assessment.reasons]
++    return assessment.signal, reasons
+ 
+ 
+ def classify_kr(row: pd.Series) -> tuple[str, str]:
+-    text = f"{clean(row.get('stock_name'))} {clean(row.get('sector'))} {clean(row.get('sector_detail'))} {clean(row.get('theme_hint'))}".lower()
+-    if any(key in text for key in ["반도체", "hbm", "ssd", "저장장치", "프리커서", "패키지", "mlcc", "삼성전기"]):
+-        return "주도 섹터 본류", "반도체/AI 부품"
+-    if any(key in text for key in ["조선", "선박", "해양플랜트", "특수선"]):
+-        return "주도 섹터 본류", "조선"
+-    if any(key in text for key in ["전력기기", "변압", "전력망", "원전", "발전 플랜트", "보일러", "두산에너빌리티"]):
+-        return "주도 섹터 본류", "전력기기/원전"
+-    if any(key in text for key in ["이차전지", "2차전지", "배터리", "전지 장비"]):
+-        return "주도 섹터 일부", "2차전지 일부"
+-    if any(key in text for key in ["신재생", "전기공사", "발전 epc", "발전 / 전기"]):
+-        return "인접 테마", "전력 인프라 인접"
+-    if "로봇" in text:
+-        return "인접 테마", "로봇/자동화"
+-    if any(key in text for key in ["자동차", "전기차", "열관리", "차체부품"]):
+-        return "비주도/순환", "자동차/부품"
+-    return "개별 실적주", clean(row.get("sector_detail")) or clean(row.get("sector")) or "미분류"
++    return "비주도/관찰", "동적 주도섹터 매칭 필요"
+ 
+ 
+ def classify_us(row: pd.Series) -> tuple[str, str]:
+-    text = f"{clean(row.get('stock_name'))} {clean(row.get('sector'))} {clean(row.get('sector_detail'))} {clean(row.get('industry'))}".lower()
+-    if any(
+-        key in text
+-        for key in [
+-            "semiconductor",
+-            "machine vision",
+-            "factory automation",
+-            "artificial intelligence",
+-            "data center",
+-            "software",
+-        ]
+-    ):
+-        return "주도 섹터 본류", "AI/자동화/소프트웨어"
+-    if any(key in text for key in ["lng", "energy services", "offshore", "oilfield", "midstream", "pipeline"]):
+-        return "인접 테마", "에너지/LNG"
+-    if any(key in text for key in ["gold", "royalty", "streaming", "mining"]):
+-        return "인접 테마", "금/원자재"
+-    if any(key in text for key in ["medical devices", "healthcare distribution", "respiratory", "vascular"]):
+-        return "개별 실적주", "헬스케어 방어/기기"
+-    if "biotech" in text or "therapeutics" in text:
+-        return "비주도/고위험", "바이오텍"
+-    return "개별 실적주", clean(row.get("sector_detail")) or clean(row.get("sector")) or "미분류"
++    return "비주도/관찰", "동적 주도섹터 매칭 필요"
+ 
+ 
+ def add_classification(df: pd.DataFrame, market: str) -> pd.DataFrame:
+@@ -416,119 +339,8 @@ def numeric_col(df: pd.DataFrame, column: str, default: float | None = None) ->
+ 
+ 
+ def add_recommendation_fields(df: pd.DataFrame) -> pd.DataFrame:
+-    """Add a single practical recommendation score/gate used by briefings and TV lists."""
+-    if df.empty:
+-        return df
+-
+-    out = df.copy()
+-    text = pd.Series("", index=out.index, dtype="object")
+-    for col in ["market", "stock_name", "sector", "sector_detail", "industry", "leadership_bucket", "leadership_theme"]:
+-        if col in out.columns:
+-            text = text + " " + out[col].fillna("").astype(str)
+-    text = text.str.lower()
+-
+-    bucket = out.get("leadership_bucket", pd.Series("", index=out.index)).fillna("").astype(str)
+-    theme = out.get("leadership_theme", pd.Series("", index=out.index)).fillna("").astype(str)
+-    stance = out.get("trade_stance", pd.Series("", index=out.index)).fillna("").astype(str)
+-    leadership_gate = out.get("leadership_gate", pd.Series("", index=out.index)).fillna("").astype(str)
+-    base = out.get("base_quality_label", pd.Series("", index=out.index)).fillna("").astype(str)
+-    entry = out.get("entry_zone_label", pd.Series("", index=out.index)).fillna("").astype(str)
+-    risk = out.get("risk_first_status", pd.Series("", index=out.index)).fillna("").astype(str)
+-    margin = out.get("margin_quality", pd.Series("", index=out.index)).fillna("").astype(str)
+-
+-    biotech_terms = (
+-        r"biotech|biotechnology|therapeutic|therapeutics|clinical-stage|oncology|"
+-        r"rare disease|drug development|바이오텍|신약|제약"
+-    )
+-    is_biotech = text.str.contains(biotech_terms, regex=True, na=False) | theme.str.contains("바이오텍", na=False)
+-    high_risk_bucket = bucket.eq("비주도/고위험")
+-
+-    latest_opm = numeric_col(out, "opm_latest_q")
+-    roll4_opm = numeric_col(out, "opm_roll4q")
+-    roll12_opm = numeric_col(out, "opm_roll12q")
+-    revenue_current = numeric_col(out, "announced_revenue_current")
+-
+-    revenue_absent = revenue_current.notna() & revenue_current.le(0)
+-    opm_distorted = (
+-        margin.str.contains("적자|왜곡", regex=True, na=False)
+-        | (latest_opm.lt(0) & roll4_opm.lt(0))
+-        | (roll4_opm.lt(0) & roll12_opm.lt(0))
+-        | (is_biotech & revenue_absent)
+-    )
+-    high_risk = high_risk_bucket | is_biotech
+-
+-    rs_weak_or_unknown = leadership_gate.isin(["RS미확인", "RS약세", "RS약함", ""])
+-    excluded = stance.str.contains("제외", na=False)
+-    extended_or_risky = (
+-        base.isin(["extended", "volatile"])
+-        | entry.str.contains("추격 금지", na=False)
+-        | risk.str.contains("과다|축소", regex=True, na=False)
+-    )
+-    rs_only_observation = stance.eq("관찰") & rs_weak_or_unknown & ~extended_or_risky
+-    stance_ok = stance.isin(["돌파 대기", "눌림 대기"]) | rs_only_observation
+-
+-    practical = stance_ok & ~excluded & ~high_risk & ~opm_distorted & ~revenue_absent & ~extended_or_risky
+-    immediate_buy = practical & ~rs_weak_or_unknown & stance.eq("돌파 대기")
+-
+-    briefing_score = numeric_col(out, "briefing_score", 0.0).fillna(0.0)
+-    vcs_score = numeric_col(out, "vcs_score", 0.0).fillna(0.0)
+-    recommend_score = briefing_score.copy()
+-    recommend_score += vcs_score.clip(lower=0, upper=100) * 0.05
+-    recommend_score += stance.map({"돌파 대기": 8.0, "눌림 대기": 2.0, "관찰": -4.0, "제외": -100.0}).fillna(-2.0)
+-    recommend_score += leadership_gate.map({"RS통과": 8.0, "RSNHBP": 10.0, "RS둔화": 2.0, "RS미확인": -8.0, "RS약세": -12.0, "RS약함": -12.0}).fillna(-4.0)
+-    recommend_score += base.map({"tight": 6.0, "constructive": 4.0, "needs_chart_review": 0.0, "volatile": -8.0, "extended": -12.0}).fillna(0.0)
+-    recommend_score -= high_risk.astype(int) * 80.0
+-    recommend_score -= opm_distorted.astype(int) * 40.0
+-    recommend_score -= revenue_absent.astype(int) * 20.0
+-    recommend_score -= extended_or_risky.astype(int) * 10.0
+-    recommend_score += practical.astype(int) * 12.0
+-    recommend_score += immediate_buy.astype(int) * 8.0
+-
+-    bucket_labels = pd.Series("관찰 후보", index=out.index, dtype="object")
+-    bucket_labels.loc[excluded] = "제외"
+-    bucket_labels.loc[high_risk & is_biotech] = "비주도/고위험 / 바이오텍"
+-    bucket_labels.loc[high_risk & ~is_biotech] = "비주도/고위험"
+-    bucket_labels.loc[~high_risk & opm_distorted] = "실적/OPM 검증 필요"
+-    bucket_labels.loc[~high_risk & ~opm_distorted & extended_or_risky] = "눌림 대기 / 리스크 관리"
+-    bucket_labels.loc[practical & rs_weak_or_unknown] = "실전 후보 / RS 확인 필요"
+-    bucket_labels.loc[practical & ~rs_weak_or_unknown] = "실전 추천 후보"
+-    bucket_labels.loc[immediate_buy] = "즉시매수 후보"
+-
+-    reasons: list[str] = []
+-    for idx in out.index:
+-        row_reasons: list[str] = []
+-        if bool(high_risk.loc[idx]):
+-            row_reasons.append("고위험/바이오")
+-        if bool(opm_distorted.loc[idx]):
+-            row_reasons.append("적자 또는 OPM 왜곡")
+-        if bool(revenue_absent.loc[idx]):
+-            row_reasons.append("매출 없음/확인 필요")
+-        if bool(rs_weak_or_unknown.loc[idx]):
+-            row_reasons.append("RS 확인 필요")
+-        if bool(extended_or_risky.loc[idx]):
+-            row_reasons.append("이격/리스크 과다")
+-        if not row_reasons:
+-            row_reasons.append("실전 추천 기준 통과")
+-        reasons.append(", ".join(row_reasons))
+-
+-    out["is_biotech_or_high_risk"] = high_risk
+-    out["is_loss_or_opm_distorted"] = opm_distorted
+-    out["is_revenue_absent_or_zero"] = revenue_absent
+-    out["is_rs_unconfirmed_or_weak"] = rs_weak_or_unknown
+-    out["is_extended_or_risky"] = extended_or_risky
+-    out["is_practical_recommendation"] = practical
+-    out["immediate_buy_ok"] = immediate_buy
+-    out["recommend_bucket"] = bucket_labels
+-    out["recommend_reason"] = reasons
+-    out["recommend_score"] = recommend_score.round(4)
+-
+-    out["_practical_order"] = out["is_practical_recommendation"].astype(int)
+-    out = out.sort_values(
+-        ["_practical_order", "recommend_score", "briefing_score", "vcs_score"],
+-        ascending=[False, False, False, False],
+-        na_position="last",
+-    ).drop(columns=["_practical_order"])
+-    return out.reset_index(drop=True)
++    """Compatibility wrapper for the canonical v2 recommendation policy."""
++    return enrich_recommendations(df)
+ 
+ 
+ def add_origin_to_stem(stem: str, origin: str) -> str:
+@@ -659,6 +471,19 @@ def candidate_brief(row: pd.Series, market_label: str) -> str:
+     recommend_reason = clean(row.get("recommend_reason"))
+     recommend_score = row.get("recommend_score")
+     immediate_buy = truthy_scalar(row.get("immediate_buy_ok"))
++    directness = clean(row.get("business_directness"))
++    matched_sector = clean(row.get("matched_lead_sector"))
++    sector_score = row.get("sector_leadership_score")
++    earnings_quality = clean(row.get("earnings_quality"))
++    earnings_quarter = clean(row.get("earnings_quarter"))
++    earnings_release = clean(row.get("earnings_release_date"))
++    earnings_source = clean(row.get("earnings_source_type"))
++    earnings_age = row.get("earnings_age_days")
++    rs_score = row.get("rs_score")
++    rs_benchmark = clean(row.get("rs_benchmark"))
++    rs_source = clean(row.get("rs_benchmark_source"))
++    rs_method = clean(row.get("rs_method"))
++    rs_confidence = clean(row.get("rs_confidence"))
+ 
+     entry = "눌림/재돌파 관찰"
+     if pd.notna(ma50) and ma50 > 18:
+@@ -672,11 +497,13 @@ def candidate_brief(row: pd.Series, market_label: str) -> str:
+         f"{name}({symbol})는 {detail}로 분류되고, 탑다운으로는 {bucket}의 {theme} 쪽이다. "
+         f"추천 분류는 '{recommend_bucket or '미분류'}'(점수 {num(recommend_score)})이며, "
+         f"근거는 {recommend_reason or '자동 점검 필요'}이다. "
++        f"당일 주도 섹터 매칭은 {matched_sector or '미확인'}(점수 {num(sector_score)}), 사업 직접성은 {directness or '미확인'}이다. "
+         f"VCS는 {num(vcs)}이고 ATRP는 {num(atrp)}라 움직임은 살아 있다. "
+         f"분기 매출/영업이익 YoY는 {pct(qrev)} / {pct(qop)}이고, "
+-        f"OPM은 최신/1Y/3Y가 {pct(latest)} / {pct(one_year)} / {pct(three_year)}라 '{margin}'로 본다. "
++        f"OPM은 최신/1Y/3Y가 {pct(latest)} / {pct(one_year)} / {pct(three_year)}이며 실적 품질은 '{earnings_quality or margin}'이다. "
++        f"발표 분기/일자는 {earnings_quarter or 'n/a'} / {earnings_release or 'n/a'}, 출처는 {earnings_source or 'n/a'}, 경과일은 {num(earnings_age, 0)}일이다. "
+         f"가격은 50일선 대비 {pct(ma50)}, 52주 고점 대비 {pct(high)} 위치라 매매 관점은 {entry}이다. "
+-        f"미너비니 오버레이는 스탠스 '{stance or entry}', RS '{leadership_gate or '미확인'}', "
++        f"미너비니 오버레이는 스탠스 '{stance or entry}', RS {num(rs_score)}({rs_benchmark or 'n/a'}, {rs_source or '출처 n/a'}, {rs_method or '방법 n/a'}, 신뢰도 {rs_confidence or 'n/a'}), "
+         f"베이스 '{base_quality or '차트확인필요'}', 리스크 '{risk_status or '손절계획필요'}'로 표시한다. "
+         f"즉시매수 가능 여부는 {'가능' if immediate_buy else '불가/검토 필요'}이다. "
+         f"매도 계획은 {sell_plan or '피봇 실패/손절/강세 매도 조건을 별도 입력해야 한다'}"
+@@ -684,10 +511,9 @@ def candidate_brief(row: pd.Series, market_label: str) -> str:
+ 
+ 
+ def practical_candidates(df: pd.DataFrame) -> pd.DataFrame:
+-    if df.empty or "is_practical_recommendation" not in df.columns:
+-        return df.iloc[0:0].copy()
+-    mask = df["is_practical_recommendation"].map(truthy_scalar)
+-    return df[mask].sort_values(["recommend_score", "vcs_score"], ascending=[False, False], na_position="last")
++    if df.empty:
++        return df.copy()
++    return canonical_practical_candidates(df)
+ 
+ 
+ def high_risk_candidates(df: pd.DataFrame) -> pd.DataFrame:
+@@ -705,6 +531,15 @@ def high_risk_candidates(df: pd.DataFrame) -> pd.DataFrame:
+     return df[mask].sort_values(["recommend_score", "vcs_score"], ascending=[False, False], na_position="last")
+ 
+ 
++def observation_candidates(df: pd.DataFrame) -> pd.DataFrame:
++    if df.empty or "is_practical_recommendation" not in df.columns:
++        return df.iloc[0:0].copy()
++    out = df[~df["is_practical_recommendation"].map(truthy_scalar)].copy()
++    if "observation_score" in out.columns:
++        return out.sort_values(["observation_score", "vcs_score"], ascending=[False, False], na_position="last")
++    return out.sort_values("vcs_score", ascending=False, na_position="last")
++
++
+ def write_briefing(
+     output_path: Path,
+     kr: pd.DataFrame,
+@@ -725,6 +560,11 @@ def write_briefing(
+     lines.append(f"- 생성 시각: {today}")
+     lines.append(f"- 시장 판단: {grade}")
+     lines.append(f"- 실행 범위: {scan_scope}")
++    if not sector_leadership.empty and "leadership_universe_scope" in sector_leadership.columns:
++        scopes = ", ".join(sorted(set(sector_leadership["leadership_universe_scope"].dropna().astype(str))))
++    else:
++        scopes = "미확인"
++    lines.append(f"- 후보 유니버스: {scan_scope}; 주도 섹터 유니버스: {scopes}")
+     lines.append("- 기준: VCS >= 45, ATRP >= 2, deep-minervini balanced 실적 라벨, earnings_good=True 우선")
+     lines.append("- KR/US 공통: 종가가 50일선 아래라도 10% 이내면 scan 단계 통과 허용")
+     lines.append("- 추천 기준: recommend_score와 is_practical_recommendation으로 실전 추천 후보를 분리")
+@@ -784,8 +624,8 @@ def write_briefing(
+ 
+     kr_practical = practical_candidates(kr)
+     us_practical = practical_candidates(us)
+-    kr_high_risk = high_risk_candidates(kr)
+-    us_high_risk = high_risk_candidates(us)
++    kr_observation = observation_candidates(kr)
++    us_observation = observation_candidates(us)
+ 
+     lines.append("## 5. 국장 실전 추천 후보")
+     lines.append("")
+@@ -809,17 +649,17 @@ def write_briefing(
+ 
+     lines.append("## 7. 비주도/고위험 및 관찰 후보")
+     lines.append("")
+-    if kr_high_risk.empty and us_high_risk.empty:
+-        lines.append("고위험/OPM 왜곡 후보는 없다.")
++    if kr_observation.empty and us_observation.empty:
++        lines.append("관찰 후보는 없다.")
+     else:
+-        if not kr_high_risk.empty:
++        if not kr_observation.empty:
+             lines.append("### KR")
+-            for _, row in kr_high_risk.head(12).iterrows():
++            for _, row in kr_observation.head(12).iterrows():
+                 lines.append(candidate_brief(row, "국장"))
+                 lines.append("")
+-        if not us_high_risk.empty:
++        if not us_observation.empty:
+             lines.append("### US")
+-            for _, row in us_high_risk.head(12).iterrows():
++            for _, row in us_observation.head(12).iterrows():
+                 lines.append(candidate_brief(row, "미장"))
+                 lines.append("")
+ 
+@@ -843,12 +683,14 @@ def parse_args() -> argparse.Namespace:
+     parser.add_argument("--kr-csv", type=Path, default=None)
+     parser.add_argument("--us-csv", type=Path, default=None)
+     parser.add_argument("--sector-leadership-csv", type=Path, default=None)
++    parser.add_argument("--us-sector-leadership-csv", type=Path, default=None)
+     parser.add_argument("--basket-suggestions-csv", type=Path, default=None)
+     parser.add_argument("--output-dir", type=Path, default=None)
+     parser.add_argument("--output-md", type=Path, default=None)
+     parser.add_argument("--top-n", type=int, default=10)
+     parser.add_argument("--include-all", action="store_true", help="Do not filter to earnings_good=True.")
+     parser.add_argument("--skip-market-snapshot", action="store_true", help="Skip yfinance market snapshot.")
++    parser.add_argument("--skip-rs-enrichment", action="store_true", help="Do not fetch RS data; candidates fail closed to observation.")
+     parser.add_argument("--origin", default="CODEX", help="Result filename origin tag, e.g. CODEX or ANTI.")
+     parser.add_argument("--scan-scope", default="daily watchlist 기반 실행", help="Reader-facing scan scope label.")
+     return parser.parse_args()
+@@ -875,9 +717,28 @@ def main() -> int:
+     kr = load_candidates(kr_path, "KR", earnings_only=earnings_only)
+     us = load_candidates(us_path, "US", earnings_only=earnings_only)
+ 
+-    kr = add_recommendation_fields(add_minervini_overlay(add_ranking(add_classification(kr, "KR"))))
+-    us = add_recommendation_fields(add_minervini_overlay(add_ranking(add_classification(us, "US"))))
+-    sector_leadership = load_sector_leadership(args.sector_leadership_csv, results_dir)
++    kr_sector_leadership = load_market_sector_leadership("KR", args.sector_leadership_csv, results_dir)
++    us_sector_leadership = load_market_sector_leadership("US", args.us_sector_leadership_csv, results_dir)
++    kr = prepare_candidates(
++        kr,
++        leadership=kr_sector_leadership,
++        rs_cache_path=results_dir / "candidate_rs_kr_cache.csv",
++        fetch_rs=not args.skip_rs_enrichment,
++        chart_enricher=lambda frame: add_minervini_overlay(add_ranking(frame)),
++    )
++    us = prepare_candidates(
++        us,
++        leadership=us_sector_leadership,
++        rs_cache_path=results_dir / "candidate_rs_us_cache.csv",
++        fetch_rs=not args.skip_rs_enrichment,
++        chart_enricher=lambda frame: add_minervini_overlay(add_ranking(frame)),
++    )
++    sector_frames = []
++    if not kr_sector_leadership.empty:
++        sector_frames.append(kr_sector_leadership.assign(market="KR"))
++    if not us_sector_leadership.empty:
++        sector_frames.append(us_sector_leadership.assign(market="US"))
++    sector_leadership = pd.concat(sector_frames, ignore_index=True) if sector_frames else pd.DataFrame()
+     basket_suggestions = load_basket_suggestions(args.basket_suggestions_csv, results_dir)
+ 
+     exported = {
+diff --git a/build_whole_market_briefings.py b/build_whole_market_briefings.py
+index 3891438..f91650c 100644
+--- a/build_whole_market_briefings.py
++++ b/build_whole_market_briefings.py
+@@ -7,6 +7,9 @@ from typing import Iterable
+ 
+ import pandas as pd
+ 
++from briefing_logic_v2 import canonical_practical_candidates
++from candidate_enrichment_v2 import prepare_candidates
++
+ 
+ DEFAULT_RESULTS_DIR = Path("..") / "data" / "vcs_results"
+ 
+@@ -122,13 +125,12 @@ def truthy(value: object) -> bool:
+ 
+ def sort_by_recommendation(df: pd.DataFrame) -> pd.DataFrame:
+     out = df.copy()
+-    if "recommend_score" not in out.columns:
+-        out["recommend_score"] = out.get("quality_score", pd.Series(0.0, index=out.index))
+-    out["recommend_score"] = pd.to_numeric(out["recommend_score"], errors="coerce").fillna(0.0)
+-    if "is_practical_recommendation" in out.columns:
+-        out["_practical_order"] = out["is_practical_recommendation"].map(truthy).astype(int)
+-    else:
+-        out["_practical_order"] = 1
++    required = {"recommend_score", "is_practical_recommendation"}
++    missing = sorted(required - set(out.columns))
++    if missing:
++        raise ValueError(f"candidate schema missing required practical fields: {', '.join(missing)}")
++    out["recommend_score"] = pd.to_numeric(out["recommend_score"], errors="coerce")
++    out["_practical_order"] = out["is_practical_recommendation"].map(truthy).astype(int)
+     return out.sort_values(
+         ["_practical_order", "recommend_score", "quality_score", "vcs_score"],
+         ascending=[False, False, False, False],
+@@ -335,7 +337,22 @@ def write_market_briefings(
+     origin: str,
+     top_n: int,
+     scan_scope: str,
++    fetch_rs: bool = True,
+ ) -> tuple[Path, Path]:
++    kr_stocks = prepare_candidates(
++        kr_stocks,
++        leadership=kr_sector,
++        rs_cache_path=output_dir / "candidate_rs_kr_cache.csv",
++        fetch_rs=fetch_rs,
++    )
++    us_stocks = prepare_candidates(
++        us_stocks,
++        leadership=us_sector,
++        rs_cache_path=output_dir / "candidate_rs_us_cache.csv",
++        fetch_rs=fetch_rs,
++    )
++    kr_stocks.to_csv(kr_stocks_path, index=False, encoding="utf-8-sig")
++    us_stocks.to_csv(us_stocks_path, index=False, encoding="utf-8-sig")
+     kr_rank = add_kr_detail_leadership(
+         add_kr_theme_leadership(rank_kr(kr_stocks, kr_sector), kr_theme_sector),
+         kr_detail_sector,
+@@ -345,21 +362,28 @@ def write_market_briefings(
+     kr_theme_candidates = load_member_candidates(member_file_for(kr_theme_sector_path)) if kr_theme_sector_path else {}
+     kr_detail_candidates = load_member_candidates(member_file_for(kr_detail_sector_path)) if kr_detail_sector_path else {}
+     us_candidates = load_member_candidates(member_file_for(us_sector_path))
++    candidate_scope_label = "daily watchlist 후보" if "watchlist" in scan_scope.lower() else "whole-market 후보"
++    kr_leadership_scope = clean(kr_sector.get("leadership_universe_scope", pd.Series(["unknown"])).iloc[0]) if not kr_sector.empty else "unknown"
++    us_leadership_scope = clean(us_sector.get("leadership_universe_scope", pd.Series(["unknown"])).iloc[0]) if not us_sector.empty else "unknown"
++
++    kr_scope_title = "독립 주간 liquid universe" if "fresh" in kr_leadership_scope else ("오래된 주간 유니버스 캐시(주의)" if "stale" in kr_leadership_scope else "후보군 기반 fallback(전체시장 아님)")
++    us_scope_title = "독립 주간 liquid universe" if "fresh" in us_leadership_scope else ("오래된 주간 유니버스 캐시(주의)" if "stale" in us_leadership_scope else "후보군 기반 fallback(전체시장 아님)")
+ 
+     kr_md = output_dir / f"{prefix}_{origin}_국장_전체시장_미너비니심화_브리핑.md"
+     us_md = output_dir / f"{prefix}_{origin}_미장_전체시장_미너비니심화_브리핑.md"
+ 
+     lines: list[str] = [
+-        f"# {prefix} {origin} 국장 전체시장 미너비니 심화 브리핑",
++        f"# {prefix} {origin} 국장 {candidate_scope_label} 미너비니 심화 브리핑",
+         "",
+         f"- 실행 범위: {scan_scope}",
++        f"- 후보 유니버스: {candidate_scope_label}; 주도 섹터 유니버스: {kr_leadership_scope}",
+         "- 기준: KRX 업종 주도성 -> 실질 테마 sector_detail 밀집도 -> VCS 13/63/50 >= 45 -> deep-minervini balanced 실적 라벨 -> earnings_good=True 우선",
+         "- KR/US 공통: 종가가 50일선 아래라도 10% 이내면 scan 단계 통과 허용",
+         "- 추천 기준: recommend_score와 is_practical_recommendation으로 실전 추천 후보를 우선 표시",
+         f"- 실적양호 후보: {len(kr_stocks)}개",
+         "- 먼저 업종 전체의 돈 흐름을 보고, 그 안에서 실제로 매매 후보가 잡혔는지 확인한다. 숫자는 배경이고, 종목 판단은 실질 테마와 실적/차트가 만나는 지점에서 한다.",
+         "",
+-        "## 전체시장 주도 섹터",
++        f"## {kr_scope_title} 주도 섹터",
+         "",
+         "아래 업종들은 하루 수익률만 본 것이 아니다. 5D/20D의 탄력에 60D/120D 중기 흐름, 50/200일선 위 비율, 거래량과 신고가 근접도를 함께 반영했다. 각 줄의 마지막에는 해당 업종 안에서 실제 VCS 후보와 실적양호 후보가 무엇인지 직접 적었다.",
+     ]
+@@ -380,8 +404,14 @@ def write_market_briefings(
+     lines += ["", "## 실전 추천 후보 우선 순위"]
+     lines.append("")
+     lines.append("여기서는 공식 KRX 업종만 보지 않고 `sector_detail`을 실질 테마로 같이 본다. 같은 실질 테마 후보가 반복될수록 단순 개별주보다 한 단계 더 의미 있게 본다.")
+-    for i, (_, row) in enumerate(kr_rank.head(top_n).iterrows(), start=1):
++    kr_practical = canonical_practical_candidates(kr_rank, limit=top_n)
++    for i, (_, row) in enumerate(kr_practical.iterrows(), start=1):
+         lines.append(kr_stock_line(i, row))
++    if kr_practical.empty:
++        lines.append("실전 추천 하드 게이트를 통과한 후보가 없다. 관찰 후보로 순위를 채우지 않는다.")
++    lines += ["", "## 관찰 후보"]
++    for _, row in kr_rank[~kr_rank["is_practical_recommendation"].map(truthy)].head(top_n).iterrows():
++        lines.append(f"- {clean(row.get('stock_name'))}({clean(row.get('symbol'))}): {clean(row.get('recommend_reason'))}")
+     lines += ["", "## 생성 파일", f"- {kr_sector_path}", f"- {kr_stocks_path}", f"- {kr_md}"]
+     if kr_theme_sector_path:
+         lines.insert(-1, f"- {kr_theme_sector_path}")
+@@ -390,16 +420,17 @@ def write_market_briefings(
+     kr_md.write_text("\n".join(lines), encoding="utf-8-sig")
+ 
+     lines = [
+-        f"# {prefix} {origin} 미장 전체시장 미너비니 심화 브리핑",
++        f"# {prefix} {origin} 미장 {candidate_scope_label} 미너비니 심화 브리핑",
+         "",
+         f"- 실행 범위: {scan_scope}",
++        f"- 후보 유니버스: {candidate_scope_label}; 주도 섹터 유니버스: {us_leadership_scope}",
+         "- 기준: US Yahoo industry 주도성 -> 실질 테마 sector_detail 밀집도 -> VCS 13/63/50 >= 45 -> deep-minervini balanced 실적 라벨 -> earnings_good=True 우선",
+         "- KR/US 공통: 종가가 50일선 아래라도 10% 이내면 scan 단계 통과 허용",
+         "- 추천 기준: recommend_score와 is_practical_recommendation으로 실전 추천 후보를 우선 표시",
+         f"- 실적양호 후보: {len(us_stocks)}개",
+         "- 먼저 Yahoo industry 단위의 시장 흐름을 보고, 그 안에서 실제 VCS 후보와 실적양호 후보가 잡혔는지 확인한다. 종목 단계에서는 broad industry보다 실질 테마를 더 세밀하게 본다.",
+         "",
+-        "## 전체시장 주도 섹터",
++        f"## {us_scope_title} 주도 섹터",
+         "",
+         "미장도 단순 당일 강세가 아니라 5D/20D/60D/120D 흐름과 50/200일선 확산을 같이 본다. 각 업종마다 실제 VCS 후보와 실적양호 후보를 함께 적어, 섹터 강도와 진입 후보를 분리했다.",
+     ]
+@@ -408,8 +439,14 @@ def write_market_briefings(
+     lines += ["", "## 실전 추천 후보 우선 순위"]
+     lines.append("")
+     lines.append("아래 순위는 업종점수, 실질 테마 밀집도, VCS, 실적, 차트 위치를 함께 본 결과다. 바이오처럼 숫자가 왜곡되기 쉬운 후보는 수익성 안정성을 더 보수적으로 본다.")
+-    for i, (_, row) in enumerate(us_rank.head(top_n).iterrows(), start=1):
++    us_practical = canonical_practical_candidates(us_rank, limit=top_n)
++    for i, (_, row) in enumerate(us_practical.iterrows(), start=1):
+         lines.append(us_stock_line(i, row))
++    if us_practical.empty:
++        lines.append("실전 추천 하드 게이트를 통과한 후보가 없다. 관찰 후보로 순위를 채우지 않는다.")
++    lines += ["", "## 관찰 후보"]
++    for _, row in us_rank[~us_rank["is_practical_recommendation"].map(truthy)].head(top_n).iterrows():
++        lines.append(f"- {clean(row.get('stock_name'))}({clean(row.get('symbol'))}): {clean(row.get('recommend_reason'))}")
+     lines += ["", "## 생성 파일", f"- {us_sector_path}", f"- {us_stocks_path}", f"- {us_md}"]
+     us_md.write_text("\n".join(lines), encoding="utf-8-sig")
+     return kr_md, us_md
+@@ -429,6 +466,7 @@ def parse_args() -> argparse.Namespace:
+     parser.add_argument("--origin", default="CODEX")
+     parser.add_argument("--top-n", type=int, default=15)
+     parser.add_argument("--scan-scope", default="daily watchlist 기반 실행")
++    parser.add_argument("--skip-rs-enrichment", action="store_true", help="Dry-run only: leave RS unavailable and fail candidates closed.")
+     return parser.parse_args()
+ 
+ 
+@@ -483,6 +521,7 @@ def main() -> int:
+         origin=clean(args.origin).upper() or "CODEX",
+         top_n=args.top_n,
+         scan_scope=args.scan_scope,
++        fetch_rs=not args.skip_rs_enrichment,
+     )
+ 
+     print(f"KR_briefing={kr_md}")
+diff --git a/candidate_enrichment_v2.py b/candidate_enrichment_v2.py
+new file mode 100644
+index 0000000..066804d
+--- /dev/null
++++ b/candidate_enrichment_v2.py
+@@ -0,0 +1,241 @@
++"""Data enrichment used immediately before briefing candidate selection."""
++from __future__ import annotations
++
++from pathlib import Path
++from typing import Callable
++import re
++
++import numpy as np
++import pandas as pd
++
++from briefing_logic_v2 import (
++    FRESH_LEADERSHIP_SCOPE,
++    classify_business_directness,
++    classify_earnings_quality,
++    enrich_recommendations,
++)
++from kr_index_sources import naver_index_history
++from relative_strength import RSConfig, calc_rs_metrics
++
++try:
++    import yfinance as yf
++except Exception:  # pragma: no cover - runtime dependency
++    yf = None
++
++
++RS_OUTPUT_COLUMNS = [
++    "rs_benchmark", "rs_benchmark_source", "rs_score", "rs_above_ma", "rs_mom_5d",
++    "rs_mom_21d", "rs_new_high", "rs_new_high_before_price", "rs_method", "rs_confidence",
++    "rs_line", "rs_ma", "rs_ma_gap_pct", "rs_asof",
++]
++
++
++def leadership_scope_for_frame(leadership: pd.DataFrame) -> str:
++    if leadership is None or leadership.empty or "leadership_universe_scope" not in leadership.columns:
++        return "unknown"
++    values = leadership["leadership_universe_scope"].dropna().astype(str).map(str.strip)
++    values = values[values != ""]
++    if values.empty:
++        return "unknown"
++    return values.iloc[0]
++
++
++def benchmark_for_symbol(symbol: str, market: str) -> tuple[str, str | None]:
++    symbol = str(symbol).upper()
++    if market.upper() == "KR":
++        return ("KOSDAQ", None) if symbol.endswith(".KQ") else ("KOSPI", None)
++    return "QQQ", "SPY"
++
++
++def _history(symbol: str, period: str = "2y") -> pd.DataFrame:
++    if yf is None:
++        return pd.DataFrame()
++    try:
++        return yf.Ticker(symbol).history(period=period, interval="1d", auto_adjust=False)
++    except Exception:
++        return pd.DataFrame()
++
++
++def _benchmark_history(label: str) -> tuple[pd.DataFrame, str]:
++    if label == "KOSPI":
++        ticker = "^KS11"
++    elif label == "KOSDAQ":
++        ticker = "^KQ11"
++    else:
++        ticker = label
++    frame = _history(ticker)
++    if not frame.empty:
++        return frame, f"yfinance:{ticker}"
++    if label in {"KOSPI", "KOSDAQ"}:
++        try:
++            frame = naver_index_history(ticker)
++        except Exception:
++            frame = pd.DataFrame()
++        if not frame.empty:
++            return frame, f"naver:{ticker}"
++    return pd.DataFrame(), "unavailable"
++
++
++def _confidence(stock: pd.DataFrame, benchmark: pd.DataFrame) -> str:
++    if stock.empty or benchmark.empty:
++        return "unavailable"
++    stock_index = pd.DatetimeIndex(stock.index).normalize()
++    benchmark_index = pd.DatetimeIndex(benchmark.index).normalize()
++    aligned = len(stock_index.intersection(benchmark_index))
++    return "high" if aligned >= 252 else "medium" if aligned >= 126 else "low"
++
++
++def _empty_rs(label: str, source: str = "unavailable") -> dict[str, object]:
++    return {
++        "rs_benchmark": label,
++        "rs_benchmark_source": source,
++        "rs_score": np.nan,
++        "rs_above_ma": pd.NA,
++        "rs_mom_5d": np.nan,
++        "rs_mom_21d": np.nan,
++        "rs_new_high": pd.NA,
++        "rs_new_high_before_price": pd.NA,
++        "rs_method": "relative_line_ema21_percentile_proxy",
++        "rs_confidence": "unavailable",
++        "rs_line": np.nan,
++        "rs_ma": np.nan,
++        "rs_ma_gap_pct": np.nan,
++        "rs_asof": "",
++    }
++
++
++def enrich_relative_strength(
++    df: pd.DataFrame,
++    *,
++    cache_path: Path | None = None,
++    history_loader: Callable[[str], pd.DataFrame] | None = None,
++) -> pd.DataFrame:
++    if df.empty:
++        return df.copy()
++    loader = history_loader or _history
++    cache = pd.DataFrame()
++    if cache_path is not None and cache_path.exists():
++        try:
++            cache = pd.read_csv(cache_path, encoding="utf-8-sig")
++        except Exception:
++            cache = pd.DataFrame()
++    cached = cache.drop_duplicates("symbol", keep="last").set_index("symbol") if "symbol" in cache.columns else pd.DataFrame()
++
++    benchmark_cache: dict[str, tuple[pd.DataFrame, str]] = {}
++    rows: list[dict[str, object]] = []
++    for _, source_row in df.iterrows():
++        row = source_row.to_dict()
++        symbol = str(row.get("symbol", "")).strip()
++        market = str(row.get("market", "US")).upper()
++        if not cached.empty and symbol in cached.index:
++            cached_row = cached.loc[symbol]
++            if isinstance(cached_row, pd.DataFrame):
++                cached_row = cached_row.iloc[-1]
++            if str(cached_row.get("rs_asof", "")) == str(row.get("date", "")) and pd.notna(cached_row.get("rs_score")):
++                for column in RS_OUTPUT_COLUMNS:
++                    row[column] = cached_row.get(column)
++                rows.append(row)
++                continue
++
++        benchmark_label, fallback = benchmark_for_symbol(symbol, market)
++        if benchmark_label not in benchmark_cache:
++            benchmark_cache[benchmark_label] = _benchmark_history(benchmark_label)
++        benchmark, benchmark_source = benchmark_cache[benchmark_label]
++        if benchmark.empty and fallback:
++            if fallback not in benchmark_cache:
++                benchmark_cache[fallback] = _benchmark_history(fallback)
++            benchmark, benchmark_source = benchmark_cache[fallback]
++            benchmark_label = fallback
++
++        stock = loader(symbol)
++        if stock.empty or benchmark.empty:
++            metrics = _empty_rs(benchmark_label, benchmark_source)
++        else:
++            metrics = calc_rs_metrics(stock, benchmark, RSConfig(benchmark_label=benchmark_label))
++            metrics.update(
++                {
++                    "rs_benchmark_source": benchmark_source,
++                    "rs_method": "relative_line_ema21_percentile_proxy",
++                    "rs_confidence": _confidence(stock, benchmark),
++                    "rs_asof": str(row.get("date", "")) or pd.Timestamp(stock.index[-1]).date().isoformat(),
++                }
++            )
++        row.update({column: metrics.get(column) for column in RS_OUTPUT_COLUMNS})
++        rows.append(row)
++
++    out = pd.DataFrame(rows)
++    if cache_path is not None:
++        cache_path.parent.mkdir(parents=True, exist_ok=True)
++        cache_rows = out[["symbol", *RS_OUTPUT_COLUMNS]].drop_duplicates("symbol", keep="last")
++        cache_rows.to_csv(cache_path, index=False, encoding="utf-8-sig")
++    return out
++
++
++def enrich_earnings_quality(df: pd.DataFrame, *, as_of: pd.Timestamp | None = None) -> pd.DataFrame:
++    if df.empty:
++        return df.copy()
++    out = df.copy()
++    assessments = [classify_earnings_quality(row, as_of=as_of) for _, row in out.iterrows()]
++    out["earnings_quality"] = [item.quality for item in assessments]
++    out["earnings_verified"] = [item.verified for item in assessments]
++    out["earnings_quarter"] = [item.quarter for item in assessments]
++    out["earnings_release_date"] = [item.release_date for item in assessments]
++    out["earnings_source_type"] = [item.source_type for item in assessments]
++    out["earnings_age_days"] = [item.age_days for item in assessments]
++    out["earnings_quality_reason"] = [item.reason for item in assessments]
++    return out
++
++
++def enrich_business_directness(df: pd.DataFrame, leadership: pd.DataFrame) -> pd.DataFrame:
++    if df.empty:
++        return df.copy()
++    out = df.copy()
++    scope = leadership_scope_for_frame(leadership)
++    out["leadership_universe_scope"] = scope
++    out["leadership_scope_is_fresh"] = scope == FRESH_LEADERSHIP_SCOPE
++    matches = [classify_business_directness(row, leadership) for _, row in out.iterrows()]
++    out["business_directness"] = [item.business_directness for item in matches]
++    out["matched_lead_sector"] = [item.matched_lead_sector for item in matches]
++    out["assigned_lead_sector"] = out["matched_lead_sector"]
++    out["sector_leadership_score"] = [item.sector_leadership_score for item in matches]
++    out["needs_sector_review"] = [item.needs_sector_review for item in matches]
++    out["business_match_reason"] = [item.match_reason for item in matches]
++
++    biotech = out.apply(
++        lambda row: bool(
++            re.search(
++                r"biotech|biotechnology|therapeutics|clinical-stage|바이오텍|신약",
++                " ".join(str(row.get(col, "")) for col in ("industry", "sector_detail", "business_summary")),
++                re.IGNORECASE,
++            )
++        ),
++        axis=1,
++    )
++    out["leadership_bucket"] = out["business_directness"].map(
++        {"direct": "주도 섹터 본류", "adjacent": "인접 테마", "peripheral": "개별 실적주", "unrelated": "비주도/관찰"}
++    )
++    out.loc[biotech, "leadership_bucket"] = "비주도/고위험"
++    out["leadership_theme"] = out["matched_lead_sector"].where(out["matched_lead_sector"].astype(str).str.len() > 0, out.get("sector_detail", "미분류"))
++    out.loc[biotech, "leadership_theme"] = "바이오텍"
++    return out
++
++
++def prepare_candidates(
++    df: pd.DataFrame,
++    *,
++    leadership: pd.DataFrame,
++    rs_cache_path: Path | None = None,
++    fetch_rs: bool = True,
++    chart_enricher: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
++) -> pd.DataFrame:
++    out = enrich_earnings_quality(df)
++    out = enrich_business_directness(out, leadership)
++    if fetch_rs:
++        out = enrich_relative_strength(out, cache_path=rs_cache_path)
++    else:
++        for column in RS_OUTPUT_COLUMNS:
++            if column not in out.columns:
++                out[column] = pd.NA
++    if chart_enricher is not None:
++        out = chart_enricher(out)
++    return enrich_recommendations(out)
+diff --git a/docs/automation.md b/docs/automation.md
+index 7dab558..7e67d50 100644
+--- a/docs/automation.md
++++ b/docs/automation.md
+@@ -51,7 +51,7 @@ TELEGRAM_BOT_TOKEN=
+ TELEGRAM_CHAT_ID=
+ ```
+ 
+-The daily script sends Telegram notifications only when both variables are present. Secrets may also be exported by the shell, systemd, or cron environment instead of `.env`.
++The daily script sends Telegram notifications only when both variables are present. Secrets may also be exported by the shell, systemd, or cron environment instead of `.env`. When a variable is set both in the shell and in `.env`, the shell value wins.
+ 
+ Successful daily runs send:
+ 
+@@ -98,6 +98,7 @@ Skip behavior:
+ - `ENABLE_GDRIVE_UPLOAD=0`: skip quietly with a single log line.
+ - `ENABLE_GDRIVE_UPLOAD=1` and `rclone` missing: warn and skip.
+ - `ENABLE_GDRIVE_UPLOAD=1` and the configured remote is missing: warn and skip.
++- When enabled, the script first creates the dated Drive folder with `rclone mkdir` and then uploads files into that folder.
+ - Upload failures for individual files are logged but do not change the briefing exit code.
+ 
+ Set up `rclone` interactively on the server:
+@@ -184,16 +185,17 @@ The script writes its log to:
+ logs/YYYYMMDD_daily.log
+ ```
+ 
+-## Recommendation Logic TODO
++## Recommendation Logic Notes
+ 
+-These are intentionally documented as follow-up improvements. Do not make a large recommendation/classification rewrite inside the cron-enablement change.
++The v2 briefing pipeline now applies the practical-vs-observation split in code and exports. The current contract is:
+ 
+-- Split `상위 후보` from `실전 추천 후보`.
+-- Show only practical recommendation candidates in Telegram Top 5.
+-- Demote biotech, deficit, and high-risk names from top recommendations, such as QTTB and RLYB.
+-- Classify biotech names as `비주도/고위험 / 바이오텍` by default.
+-- Demote immediate-buy candidates when RS is unconfirmed, below its moving average, or otherwise weak.
+-- Resolve the VCS 45 versus 47 threshold wording and implementation mismatch.
+-- State clearly whether a briefing is based on the daily watchlist or a whole-market scan.
+-- Add classification checks so names such as QTTB do not look like primary leading-sector candidates.
+-- Make recommendation scoring order explicit: `주도섹터 -> 실적 -> OPM -> VCS -> RS -> 자리/이격 -> 수급`.
++- `상위 후보` and `실전 추천 후보` are distinct.
++- Telegram Top 5 uses only practical recommendation candidates.
++- High-risk biotech, deficit, and distorted-OPM names stay in observation-only buckets.
++- Biotech names default to `비주도/고위험 / 바이오텍`.
++- RS must be confirmed and above its moving average for immediate-buy eligibility.
++- VCS is standardized at `45`.
++- Briefings state whether they come from the daily watchlist or a whole-market leadership scan.
++- The recommendation order is explicit: `주도섹터 -> 실적 -> OPM -> VCS -> RS -> 자리/이격 -> 수급`.
++
++If this policy changes again, update `docs/briefing_logic_v2.md` and the selection tests first, then refresh the automation notes.
+diff --git a/docs/briefing_logic_v2.md b/docs/briefing_logic_v2.md
+new file mode 100644
+index 0000000..af01c3e
+--- /dev/null
++++ b/docs/briefing_logic_v2.md
+@@ -0,0 +1,95 @@
++# Briefing Selection Logic v2
++
++## Fixed decision flow
++
++The briefing selection order is:
++
++1. Market regime and exposure multiplier
++2. Independent weekly liquid-universe sector leadership
++3. Company business directness to an actually leading sector
++4. VCS/base quality and MA50 position
++5. Latest announced earnings and OPM quality
++6. Relative-strength line versus the market benchmark
++7. Entry position, extension, liquidity and risk
++8. Hard gate, then one weighted recommendation score
++
++Daily watchlist candidates are never described as the whole market. Candidate files record the daily scan scope, while sector files record `leadership_universe_scope` separately. If the weekly universe is unavailable, the sector job marks its result `candidate_fallback_not_full_market`; it must not be interpreted as full-market leadership.
++
++## Weekly universe refresh
++
++Refresh the independent leadership universe and rolling daily watchlists manually:
++
++```bash
++.venv/bin/python scripts/refresh_weekly_universe.py --market both
++```
++
++Outputs are generated locally and ignored by Git:
++
++```text
++universes/kr_liquid_YYYYMMDD.csv
++universes/kr_liquid_current.csv
++universes/us_liquid_YYYYMMDD.csv
++universes/us_liquid_current.csv
++watchlists/kr_daily_current.txt
++watchlists/us_daily_current.txt
++```
++
++The scanner automatically prefers a newer `*_daily_current.txt` over the legacy dated default path. This task does not register or modify cron.
++
++The weekly refresh writes to temporary files first, validates minimum liquid-symbol count and coverage, and only then swaps the dated/current/watchlist files into place. A failed KR refresh never overwrites the US cache, and vice versa.
++
++## Business directness
++
++`business_directness` is one of `direct`, `adjacent`, `peripheral`, or `unrelated`. A company can be `direct` only when structured industry/business evidence matches a sector present in the current leadership result. Generic words such as `software`, `technology`, or `solutions` are not direct AI evidence. Ambiguous matches set `needs_sector_review=True` and remain observation-only.
++
++The practical gate also requires `leadership_universe_scope == weekly_liquid_full_market_fresh` and `sector_leadership_score >= 60`. Stale cached context and candidate fallback stay in observation mode even if the business match itself looks strong.
++
++## RS contract
++
++- KR `.KS`: KOSPI
++- KR `.KQ`: KOSDAQ
++- US: QQQ, with SPY fallback
++- Gate: RS data present and RS Line above EMA21
++- Method: `relative_line_ema21_percentile_proxy`
++- Confidence: `high`, `medium`, `low`, or `unavailable`
++
++The candidate CSV stores `rs_score`, `rs_above_ma`, `rs_mom_5d`, `rs_mom_21d`, `rs_new_high`, `rs_new_high_before_price`, benchmark/source, method and confidence. Missing or below-EMA21 RS is observation-only.
++
++## Earnings quality
++
++The candidate CSV stores announced quarter, release date, source type and age in days. Quality is one of:
++
++- `profitable_expansion`
++- `profitable_slowdown`
++- `turnaround_positive`
++- `loss_narrowing`
++- `distorted_or_missing`
++
++Missing, stale or non-verifiable data fails closed. When both one-year and three-year OPM are negative, improvement is `loss_narrowing`, not profitable expansion.
++
++## Recommendation gate and score
++
++The hard gate runs before `recommend_score`. RS unknown/below EMA21, unverified earnings, ambiguous business classification, MA50 below/overextended position, high-risk biotech and distorted OPM are observation-only.
++
++The 100-point score is:
++
++| Component | Maximum |
++| --- | ---: |
++| Sector leadership | 15 |
++| Business directness | 10 |
++| Earnings quality | 20 |
++| OPM quality | 15 |
++| VCS/base quality | 15 |
++| RS | 15 |
++| Entry position | 5 |
++| Liquidity/risk | 5 |
++
++Sector plus directness is capped at 25 and earnings plus OPM at 35 by construction. VCS appears only once. Failed candidates retain `observation_score` and reasons, but `recommend_score` is blank.
++
++## Output consistency
++
++`canonical_practical_candidates()` is the only Top selector. Briefing Top, Telegram Top and main TradingView files use the same candidates and order. A missing `is_practical_recommendation` or `recommend_score` column is an error, not an implicit pass. Observation candidates are written only to observation sections and separate `TV_observation_*` files.
++
++## Dry-run verification
++
++Build summaries and TradingView files directly in a temporary directory. Do not invoke Telegram `sendMessage`/`sendDocument` or rclone during logic rehearsals. The production automation, cron entries and delivery credentials are outside this logic change.
+diff --git a/docs/reviews/20260619_v2/DRY_RUN_EVIDENCE.md b/docs/reviews/20260619_v2/DRY_RUN_EVIDENCE.md
+new file mode 100644
+index 0000000..bf4c32f
+--- /dev/null
++++ b/docs/reviews/20260619_v2/DRY_RUN_EVIDENCE.md
+@@ -0,0 +1,140 @@
++# Dry Run Evidence
++
++Source artifact:
++
++- `results/logic_v2_audit/20260619_CODEX_dryrun/20260619_CODEX_dryrun_report.md`
++
++The report was generated from the current repository outputs for the `--market us`, `--market kr`, and `--market both` briefing paths.
++
++## Commands Referenced by the Report
++
++- `bash scripts/run_daily_briefing.sh --market us`
++- `bash scripts/run_daily_briefing.sh --market kr`
++- `bash scripts/run_daily_briefing.sh --market both`
++
++## Weekly Universe Status
++
++The weekly current files are absent locally:
++
++| file | exists | scope shown in report |
++| --- | --- | --- |
++| `universes/kr_liquid_current.csv` | no | `candidate_fallback_not_full_market` |
++| `universes/us_liquid_current.csv` | no | `candidate_fallback_not_full_market` |
++
++One live refresh attempt was made:
++
++```bash
++.venv/bin/python scripts/refresh_weekly_universe.py --market both
++```
++
++It failed safely with DNS resolution errors for both upstream data sources:
++
++- `kind.krx.co.kr`
++- `www.nasdaqtrader.com`
++
++The script logged that the existing cache was preserved.
++
++## Dry-Run Summary
++
++| market | candidate rows in report | practical candidates | observation rows | leadership scope | practical reason |
++| --- | ---: | ---: | ---: | --- | --- |
++| KR | 7 | 0 | 7 | `candidate_fallback_not_full_market` | scope gate closed by design |
++| US | 48 | 0 | 48 | `candidate_fallback_not_full_market` | scope gate closed by design |
++| BOTH | integrated practical top 0 / 0 | 0 | 0 | fallback on both markets | no fresh weekly leadership |
++
++## Why Practical Count Is 0
++
++The exact reason is not a scoring failure.
++
++The practical gate closes because the leadership universe scope is fallback, not fresh:
++
++- `leadership_universe_scope != weekly_liquid_full_market_fresh`
++- weekly current cache is missing locally
++- the safe refresh attempt failed and preserved the prior cache state
++
++This is a fail-closed outcome, not a fake empty-file outcome.
++
++## Candidate Alignment
++
++### Markdown
++
++- Practical Top in KR: empty
++- Practical Top in US: empty
++- Integrated practical Top: empty
++
++### Telegram
++
++The report shows Telegram practical content aligned with the canonical selector.
++Observation text is kept in separate sections and does not promote observation names into practical Top.
++
++### TradingView
++
++- Practical TV main symbols: `∅`
++- Practical TV observation symbols: `∅`
++- Main / observation intersection: `∅`
++
++That means there is no leakage from the practical selector into the wrong TV file.
++
++## Column Evidence - KR
++
++| column | exists | non-null | sample up to 5 |
++| --- | --- | ---: | --- |
++| `leadership_universe_scope` | yes | 7 | `candidate_fallback_not_full_market` |
++| `sector_leadership_score` | yes | 7 | `62.69`, `71.88`, `62.41`, `39.53` |
++| `business_directness` | yes | 7 | `direct` |
++| `needs_sector_review` | yes | 7 | `False` |
++| `earnings_quarter` | yes | 7 | `2026Q1` |
++| `earnings_release_date` | yes | 7 | `2026-05-11`, `2026-05-13`, `2026-05-15`, `2026-05-14`, `2026-05-12` |
++| `earnings_source_type` | yes | 7 | `official` |
++| `earnings_verified` | yes | 7 | `True` |
++| `earnings_quality` | yes | 7 | `profitable_expansion`, `turnaround_positive`, `profitable_slowdown` |
++| `opm_latest_q` | yes | 7 | `40.65832526605495`, `23.01863600581545`, `17.54897040918415`, `37.18774031424255`, `18.23030051666868` |
++| `opm_roll4q` | yes | 7 | `35.79432881006059`, `12.771977838744045`, `8.894961015801819`, `22.8635809450271`, `8.807439158794029` |
++| `opm_roll12q` | yes | 7 | `25.24070401779174`, `0.7415602889216886`, `3.505459147639354`, `10.367862201352686`, `2.671029554486072` |
++| `rs_benchmark` | yes | 7 | `KOSDAQ` |
++| `rs_benchmark_source` | yes | 7 | `yfinance:^KQ11` |
++| `rs_score` | yes | 7 | `98.0`, `91.0`, `97.0`, `99.0`, `95.0` |
++| `rs_above_ma` | yes | 7 | `True`, `False` |
++| `rs_confidence` | yes | 7 | `high` |
++| `recommend_score` | yes | 0 | `∅` |
++| `observation_score` | yes | 7 | `78.4685`, `77.2792`, `76.8555`, `72.3523`, `69.0533` |
++| `is_practical_recommendation` | yes | 7 | `False` |
++| `recommend_reason` | yes | 7 | `주도섹터 scope 미검증(candidate_fallback_not_full_market)`, `RS Line EMA21 하방`, `MA50 회복 대기` |
++
++## Column Evidence - US
++
++| column | exists | non-null | sample up to 5 |
++| --- | --- | ---: | --- |
++| `leadership_universe_scope` | yes | 48 | `candidate_fallback_not_full_market` |
++| `sector_leadership_score` | yes | 37 | `88.37`, `67.15`, `68.47`, `44.63`, `69.06` |
++| `business_directness` | yes | 48 | `direct`, `peripheral`, `adjacent`, `unrelated` |
++| `needs_sector_review` | yes | 48 | `False`, `True` |
++| `earnings_quarter` | yes | 48 | `2026Q1` |
++| `earnings_release_date` | yes | 48 | `2026-05-06`, `2026-05-05`, `2026-05-07`, `2026-04-29`, `2026-02-05` |
++| `earnings_source_type` | yes | 48 | `official` |
++| `earnings_verified` | yes | 48 | `True`, `False` |
++| `earnings_quality` | yes | 48 | `profitable_expansion`, `profitable_slowdown`, `distorted_or_missing`, `loss_narrowing` |
++| `opm_latest_q` | yes | 47 | `16.52848155696844`, `31.4903171484704`, `100.3021047423308`, `10.019813189923578`, `61.56951664638868` |
++| `opm_roll4q` | yes | 48 | `15.548527173642285`, `20.504320575310707`, `67.92882834082216`, `9.41816659690247`, `46.419872861747294` |
++| `opm_roll12q` | yes | 48 | `14.440959352965155`, `15.133278666703914`, `62.09135856077543`, `9.129107981220658`, `45.76741817217767` |
++| `rs_benchmark` | yes | 48 | `QQQ` |
++| `rs_benchmark_source` | yes | 48 | `yfinance:QQQ` |
++| `rs_score` | yes | 48 | `95.0`, `72.0`, `63.0`, `91.0`, `74.0` |
++| `rs_above_ma` | yes | 48 | `True`, `False` |
++| `rs_confidence` | yes | 48 | `high` |
++| `recommend_score` | yes | 0 | `∅` |
++| `observation_score` | yes | 48 | `77.803`, `75.9314`, `74.5039`, `74.2032`, `72.0513` |
++| `is_practical_recommendation` | yes | 48 | `False` |
++| `recommend_reason` | yes | 48 | `주도섹터 scope 미검증(candidate_fallback_not_full_market)`, `RS Line EMA21 하방`, `고위험 바이오텍`, `사업 직접성 미검증` |
++
++## Integrated Notes
++
++- Markdown practical Top symbols: `∅`
++- Telegram practical Top symbols: `∅`
++- TV main / observation intersection: `∅`
++- QTTB in main TV: `no`
++- QTTB in observation TV: `no`
++- RLYB in main TV: `no`
++- RLYB in observation TV: `no`
++
++The evidence set therefore shows a strict fail-closed stance rather than a fake promotion of observation names.
+diff --git a/docs/reviews/20260619_v2/REVIEW_BUNDLE.md b/docs/reviews/20260619_v2/REVIEW_BUNDLE.md
+new file mode 100644
+index 0000000..24601bb
+--- /dev/null
++++ b/docs/reviews/20260619_v2/REVIEW_BUNDLE.md
+@@ -0,0 +1,213 @@
++# VCS Screener V2 Review Bundle
++
++Date: 2026-06-19
++
++## Review Context
++
++This bundle is for final external review of `fix/briefing-logic-v2`.
++
++### Background
++
++The intended selection flow is:
++
++market regime
++-> independent whole-market sector leadership
++-> direct business relationship to the leading sector
++-> VCS 13/63/50 and MA50 position
++-> latest reported earnings, YoY, rolling 4Q/12Q OPM
++-> market-relative RS line / EMA21
++-> chase risk, liquidity, and entry location
++-> hard gates first, then recommendation ranking
++
++Key operating rules:
++
++- VCS threshold is 45.
++- ATRP minimum is 2.
++- Candidates may stay in the scan universe up to 10% below MA50.
++- RS unknown or below EMA21 is observation only.
++- Missing or stale earnings release date / quarter / source is observation only.
++- Biotech, OPM distortion, loss-heavy names, and ambiguous business mapping stay observational.
++- Practical recommendations are not backfilled from observation names.
++
++## Branch and Base
++
++- Branch: `fix/briefing-logic-v2`
++- Base commit: `107103b7520437ab9bacd4c76ed669feaa93f613`
++- Current branch tip at review start: `5bda406d74c474f42ddf3695e662a6a955573c55`
++
++## Scope
++
++The branch keeps cron, Telegram, Google Drive, and `.env` unchanged.
++The work focuses on the briefing selection pipeline, weekly universe safety, and review evidence.
++
++## Changed Files and Roles
++
++| File | Role |
++| --- | --- |
++| `briefing_logic_v2.py` | Canonical hard-gate policy, score composition, business directness, and fail-closed recommendation selection. |
++| `candidate_enrichment_v2.py` | Adds earnings, RS, and leadership-scope enrichment fields consumed by the canonical selector. |
++| `scripts/refresh_weekly_universe.py` | Safely refreshes weekly liquid universes and daily watchlists without overwriting good cache on failure. |
++| `scripts/run_daily_briefing.sh` | Orchestrates KR/US/both execution paths and keeps market-specific file names, Telegram, and upload packaging aligned. |
++| `scripts/build_market_briefing.py` | Builds one-market daily markdown with explicit scope labels and practical-only Top sections. |
++| `build_whole_market_briefings.py` | Builds split KR/US whole-market briefings from the same canonical selector. |
++| `build_deep_minervini_briefing.py` | Builds the integrated briefing from the same canonical practical selector. |
++| `scripts/build_tradingview_watchlists.py` | Emits practical TV files and separate observation-only TV files. |
++| `scripts/build_telegram_summary.py` | Emits Telegram summaries from the same canonical practical selector. |
++| `tests/test_briefing_logic_v2.py` | Unit and pipeline-contract coverage for the V2 selection contract. |
++| `tests/test_weekly_universe_refresh.py` | Cache-preservation tests for weekly refresh failures and low-coverage cases. |
++| `docs/briefing_logic_v2.md` | Selection-policy documentation and operational notes. |
++| `docs/automation.md` | Run-mode and cron documentation, including the VCS threshold wording fix. |
++| `install.cmd` | Deleted Windows-specific artifact that is not part of the Linux server automation path. |
++
++## Final Hard Gate Order
++
++The canonical gate in `briefing_logic_v2.enrich_recommendations()` is:
++
++1. Leadership scope must be `weekly_liquid_full_market_fresh`.
++2. `sector_leadership_score` must be present and at least 60.
++3. `business_directness` must be `direct` or `adjacent`, and `needs_sector_review` must be false.
++4. Earnings must be verified and one of `profitable_expansion`, `profitable_slowdown`, or `turnaround_positive`.
++5. RS must be present and `rs_above_ma` must be true.
++6. MA50 gap must not be below -10%; if below MA50 but within -10%, the name stays in observation as `MA50 회복 대기`.
++7. MA50 extension above the allowed range, extended bases, volatile bases, and weak VCS labels fail the gate.
++8. ATRP above the policy cap fails the gate.
++9. Biotech and OPM-distorted / loss-heavy names fail the gate.
++
++## Recommendation Score
++
++`recommend_score_method = v2_gate_then_weighted_100`
++
++Component weights:
++
++- sector leadership: 15
++- business directness: 10
++- earnings quality: 20
++- OPM quality: 15
++- VCS / base quality: 15
++- RS: 15
++- entry position: 5
++- liquidity / risk: 5
++
++Notes:
++
++- The hard gate runs before scoring.
++- Sector + directness effectively caps at 25.
++- Earnings + OPM effectively caps at 35.
++- VCS is not double-counted.
++- Practical names keep `recommend_score`; observation names keep `recommend_score = NaN` and use `observation_score`.
++
++## Weekly Universe Policy
++
++Weekly leadership is independent from the daily scan universe.
++
++- Fresh: `leadership_universe_scope == weekly_liquid_full_market_fresh`
++- Stale: `stale_cached_market_context`
++- Fallback: `candidate_fallback_not_full_market`
++
++The practical gate only accepts fresh leadership scope.
++Fallback leadership is allowed for observation and diagnostics but must not be treated as full-market leadership.
++
++The weekly refresh script writes to temporary files first and only swaps cache files into place after validation.
++If refresh fails, the existing cache is preserved.
++
++## Daily Watchlist vs Whole-Market Leadership
++
++- Daily watchlist candidates are the scan universe for the daily briefing.
++- Whole-market leadership is the independent weekly liquid universe used to judge sector strength.
++- The daily scan should never be described as the whole market.
++- If the weekly universe is missing, the leadership job must say fallback explicitly rather than pretending to be whole-market leadership.
++
++## Data Flow
++
++### Earnings
++
++`full_market_scan.py` computes and carries:
++
++- `earnings_quarter`
++- `earnings_release_date`
++- `earnings_source_type`
++- `earnings_age_days`
++- `earnings_good`
++- `announced_revenue_current`
++- `opm_latest_q`
++- `opm_roll4q`
++- `opm_roll12q`
++
++`candidate_enrichment_v2.py` reads those fields and fail-closes if they are missing or stale.
++
++### RS
++
++RS fields are written into candidate CSVs and cache files.
++
++- KR benchmark mapping: `.KS -> KOSPI`, `.KQ -> KOSDAQ`
++- US benchmark mapping: `QQQ` with `SPY` fallback
++
++Stored fields include:
++
++- `rs_benchmark`
++- `rs_benchmark_source`
++- `rs_score`
++- `rs_above_ma`
++- `rs_mom_5d`
++- `rs_mom_21d`
++- `rs_new_high`
++- `rs_new_high_before_price`
++- `rs_method`
++- `rs_confidence`
++- `rs_line`
++- `rs_ma`
++- `rs_ma_gap_pct`
++- `rs_asof`
++
++If RS cannot be computed, the candidate remains observation only.
++
++## Automation Call Flow
++
++`scripts/run_daily_briefing.sh` is the live orchestration entrypoint.
++
++Shared flow:
++
++1. `git pull --ff-only`
++2. Activate `.venv`
++3. Validate Python dependencies
++4. Run KR and/or US scan
++5. Add detailed theme enrichment
++6. Build KR/US sector leadership
++7. Build the relevant briefing markdown and DOCX
++8. Build TradingView watchlists
++9. Build Telegram summary
++10. Send Telegram message and document attachments
++11. Upload optional Google Drive package with `rclone`
++
++Market-specific behavior:
++
++- `--market us`: US scan, US briefing, US TV, US Telegram package
++- `--market kr`: KR scan, KR briefing, KR TV, KR Telegram package
++- `--market both`: KR + US scan, split market briefings, integrated briefing, integrated Telegram package, KR/US TV, optional combined Google Drive upload
++
++## Resolved Issues
++
++- Daily candidate universe is no longer described as the whole market.
++- Practical and observation candidates are separated in Markdown, Telegram, and TV outputs.
++- QTTB / RLYB style biotech names are observation-only.
++- RS unknown or below EMA21 is practical-fail closed.
++- The weekly refresh no longer overwrites a good cache on DNS / fetch failures or low-coverage refreshes.
++- The VCS threshold wording is now consistent at 45.
++- Windows-only `install.cmd` is removed from the Linux server review path.
++
++## Still Unverified
++
++- Fresh production weekly universe refresh is not yet validated on live network data in this workspace.
++- Current local state still has no weekly current cache, so the present dry-run is fail-closed and practical count is 0.
++- Positive-path practical recommendations are covered by unit tests, but not by a live fresh-cache production run in this workspace.
++
++## Main Merge Checklist
++
++Before any merge to `main`:
++
++1. Verify fresh weekly universe creation on live network once.
++2. Re-run `scripts/run_daily_briefing.sh --market us`, `kr`, and `both`.
++3. Confirm Telegram and Drive attachments still match the canonical selector.
++4. Confirm no stale/fallback leadership leaks into practical Top lists.
++5. Confirm no uncommitted changes remain.
++6. Confirm `review.patch` is up to date.
+diff --git a/docs/reviews/20260619_v2/TEST_EVIDENCE.md b/docs/reviews/20260619_v2/TEST_EVIDENCE.md
+new file mode 100644
+index 0000000..bf22b26
+--- /dev/null
++++ b/docs/reviews/20260619_v2/TEST_EVIDENCE.md
+@@ -0,0 +1,105 @@
++# Test Evidence
++
++## Execution Commands
++
++Executed in the repo root:
++
++```bash
++.venv/bin/python -m unittest discover -s tests -v
++bash -n scripts/run_daily_briefing.sh
++.venv/bin/python -m py_compile briefing_logic_v2.py candidate_enrichment_v2.py scripts/refresh_weekly_universe.py tests/test_briefing_logic_v2.py tests/test_weekly_universe_refresh.py scripts/build_market_briefing.py scripts/build_tradingview_watchlists.py scripts/build_telegram_summary.py build_deep_minervini_briefing.py build_whole_market_briefings.py
++git diff --check
++```
++
++The weekly universe refresh was also attempted once:
++
++```bash
++.venv/bin/python scripts/refresh_weekly_universe.py --market both
++```
++
++That attempt failed with DNS resolution errors and preserved the existing cache.
++
++## Result Summary
++
++- `unittest`: 24 tests, all passed
++- `bash -n`: passed
++- `py_compile`: passed
++- `git diff --check`: passed
++- weekly refresh attempt: failed safely, cache preserved
++
++## Full Test List
++
++| Test | Result | What it guards |
++| --- | --- | --- |
++| `test_ambiguous_match_requires_review` | ok | Ambiguous business mapping stays review-only. |
++| `test_ebay_and_dbd_are_not_ai_direct_from_software_word` | ok | Generic software wording does not imply AI directness. |
++| `test_mtsi_is_direct_when_semiconductors_are_actually_leading` | ok | Real semiconductor evidence maps to direct business directness. |
++| `test_missing_or_stale_earnings_fail_closed` | ok | Missing or stale earnings metadata fail closed. |
++| `test_two_negative_opm_periods_are_loss_narrowing` | ok | Two negative OPM periods are treated as loss narrowing, not expansion. |
++| `test_missing_market_data_is_neutral_not_bearish` | ok | Missing market data is neutral, not bearish. |
++| `test_custom_watchlist_is_not_overridden` | ok | Manual watchlists are not silently rewritten. |
++| `test_main_and_observation_tv_files_are_disjoint` | ok | Practical TV files and observation TV files do not overlap. |
++| `test_rolling_watchlist_replaces_stale_dated_default` | ok | Legacy dated watchlists are replaced by rolling current files. |
++| `test_rs_benchmark_mapping` | ok | KR/US benchmark mapping is correct. |
++| `test_tv_export_fails_when_practical_schema_is_missing` | ok | TV export fail-closes if practical schema is missing. |
++| `test_verified_direct_candidate_can_pass_end_to_end` | ok | A fully verified direct candidate passes the pipeline end-to-end. |
++| `test_biotech_is_observation_only` | ok | QTTB/RLYB-like biotech names are observation-only. |
++| `test_fresh_scope_and_sector_score_gate_practical` | ok | Fresh leadership scope and `sector_leadership_score >= 60` are required. |
++| `test_ma50_minus_ten_percent_is_retained_but_not_immediate` | ok | MA50 -10% names remain in scan output but are not immediate buys. |
++| `test_missing_practical_column_fails_closed` | ok | Missing practical schema fails closed. |
++| `test_practical_top_does_not_backfill_observations` | ok | Practical Top is not padded with observation names. |
++| `test_rs_unknown_or_below_ema21_is_not_practical` | ok | RS unknown or below EMA21 is not practical. |
++| `test_sector_leadership_changes_recommend_score` | ok | Sector leadership contributes to score and stays bounded. |
++| `test_full_fetch_failure_preserves_existing_cache` | ok | Weekly refresh failure does not overwrite existing cache. |
++| `test_low_coverage_preserves_existing_cache` | ok | Low-coverage weekly refresh does not overwrite existing cache. |
++| `test_main_continues_after_one_market_failure` | ok | One market failure does not stop the other market from being processed. |
++| `test_success_replaces_current_and_watchlist` | ok | Valid refresh replaces the current snapshot and rolling watchlist. |
++| `test_zero_results_preserve_existing_cache` | ok | Zero-result weekly refresh leaves existing cache intact. |
++
++## Required Regression Checks
++
++### Cache preservation
++
++Covered by:
++
++- `test_full_fetch_failure_preserves_existing_cache`
++- `test_zero_results_preserve_existing_cache`
++- `test_low_coverage_preserves_existing_cache`
++- `test_success_replaces_current_and_watchlist`
++- `test_main_continues_after_one_market_failure`
++
++### Fresh / stale / fallback leadership scope
++
++Covered by:
++
++- `test_fresh_scope_and_sector_score_gate_practical`
++- `test_verified_direct_candidate_can_pass_end_to_end`
++
++The gate only accepts `weekly_liquid_full_market_fresh`.
++
++### Sector score boundary
++
++Covered by:
++
++- `test_fresh_scope_and_sector_score_gate_practical`
++
++It explicitly checks the `59.0 < 60.0` failure case and the `60.0` pass case.
++
++### Practical / observation separation
++
++Covered by:
++
++- `test_practical_top_does_not_backfill_observations`
++- `test_main_and_observation_tv_files_are_disjoint`
++- `test_missing_practical_column_fails_closed`
++
++### Windows / UTF-8 cleanup
++
++The Linux server review path no longer depends on the Windows-only `install.cmd` artifact.
++That file was removed from the branch, which avoids the confusing cross-platform encoding and line-ending path in the Linux review flow.
++
++## Validation Notes
++
++- `bash -n scripts/run_daily_briefing.sh` passed after the shell changes.
++- `py_compile` passed for the V2 logic, weekly refresh, and downstream builders.
++- `git diff --check` passed, so there are no whitespace or patch-format issues in the current working tree.
+diff --git a/full_market_scan.py b/full_market_scan.py
+index 50eb93a..06b39c0 100644
+--- a/full_market_scan.py
++++ b/full_market_scan.py
+@@ -258,6 +258,7 @@ def get_kr_universe() -> pd.DataFrame:
+ def filter_universe_by_watchlist(universe: pd.DataFrame, watchlist: Path | None, market: str) -> pd.DataFrame:
+     if watchlist is None:
+         return universe
++    watchlist = resolve_watchlist_path(watchlist, market)
+     try:
+         symbols = set(core.read_watchlist(watchlist, market))
+     except Exception as exc:
+@@ -267,6 +268,16 @@ def filter_universe_by_watchlist(universe: pd.DataFrame, watchlist: Path | None,
+     return universe[universe["symbol"].isin(symbols)].copy().reset_index(drop=True)
+ 
+ 
++def resolve_watchlist_path(watchlist: Path, market: str) -> Path:
++    """Replace only the legacy dated default with the rolling weekly watchlist."""
++    current = watchlist.parent / f"{market.lower()}_daily_current.txt"
++    legacy_prefix = f"{market.lower()}_stage1_"
++    if current.exists() and watchlist.name.lower().startswith(legacy_prefix):
++        print(f"{market} watchlist: using weekly-refreshed {current}")
++        return current
++    return watchlist
++
++
+ def chunked(items: list[str], n: int) -> list[list[str]]:
+     return [items[i : i + n] for i in range(0, len(items), n)]
+ 
+@@ -559,17 +570,35 @@ def latest_announced_yoy_status(
+     row = state.iloc[0]
+     quarter_end = row.get("quarter_end")
+     release_source = row.get("release_source") or ""
++    release_date = pd.NaT
++    if events is not None and not events.empty:
++        eligible = pd.to_datetime(events.index, errors="coerce")
++        eligible = eligible[(eligible.notna()) & (eligible <= latest_date.normalize())]
++        if len(eligible):
++            release_date = eligible.max()
+     confidence = 1.0
+     if release_source == "dart_provisional_fair_disclosure":
+         confidence = 0.9
+     elif release_source == "inferred_release_lag":
+         confidence = 0.65
++    if release_source in {"sec_filing_date", "dart_filing_date"}:
++        source_type = "official"
++    elif release_source == "dart_provisional_fair_disclosure":
++        source_type = "provisional"
++    else:
++        source_type = "estimated" if release_source else "missing"
++    age_days = int((latest_date.normalize() - release_date.normalize()).days) if pd.notna(release_date) else None
++    quarter_label = f"{quarter_end.year}Q{quarter_end.quarter}" if pd.notna(quarter_end) else ""
+     return {
+         "earnings_good": bool(row.get("earnings_good", False)),
+         "revenue_improved": bool(row.get("revenue_improved", False)),
+         "op_income_improved": bool(row.get("op_income_improved", False)),
+         "earnings_quarter_end": quarter_end.date().isoformat() if pd.notna(quarter_end) else "",
++        "earnings_quarter": quarter_label,
++        "earnings_release_date": release_date.date().isoformat() if pd.notna(release_date) else "",
+         "earnings_release_source": release_source,
++        "earnings_source_type": source_type,
++        "earnings_age_days": age_days,
+         "earnings_release_is_official": bool(release_source in {"sec_filing_date", "dart_filing_date", "dart_provisional_fair_disclosure"}),
+         "earnings_basis": row.get("earnings_basis") or "",
+         "earnings_confidence": confidence,
+diff --git a/kr_market_sector_leadership.py b/kr_market_sector_leadership.py
+index 4f1a2dc..e49f5f5 100644
+--- a/kr_market_sector_leadership.py
++++ b/kr_market_sector_leadership.py
+@@ -27,6 +27,34 @@ from sector_leadership import (
+ 
+ 
+ DEFAULT_RESULTS_DIR = Path("..") / "data" / "vcs_results"
++REPO_ROOT = Path(__file__).resolve().parent
++
++
++def resolve_leadership_universe(requested: Path | None, results_dir: Path) -> tuple[Path, str]:
++    weekly = REPO_ROOT / "universes" / "kr_liquid_current.csv"
++    if weekly.exists():
++        try:
++            import pandas as pd
++            from datetime import datetime, timezone
++            sample = pd.read_csv(weekly, nrows=1)
++            refreshed_str = sample.get("universe_refreshed_at")
++            if refreshed_str is not None and not refreshed_str.empty and not pd.isna(refreshed_str.iloc[0]):
++                refreshed = pd.to_datetime(refreshed_str.iloc[0], utc=True)
++                age_days = (datetime.now(timezone.utc) - refreshed).days
++                if age_days <= 10:
++                    return weekly, "weekly_liquid_full_market_fresh"
++                elif age_days <= 21:
++                    return weekly, "stale_cached_market_context"
++                # If older than 21 days, fall through to fallback
++            else:
++                return weekly, "weekly_liquid_full_market_fresh"
++        except Exception as e:
++            print(f"[leadership] freshness check failed: {e}")
++            return weekly, "weekly_liquid_full_market_fresh"
++    fallback = requested or latest_file(["full_prefilter_ma_*.csv"], results_dir)
++    if fallback is None:
++        raise FileNotFoundError("No KR weekly liquid universe. Run scripts/refresh_weekly_universe.py first.")
++    return fallback, "candidate_fallback_not_full_market"
+ 
+ 
+ def latest_file(patterns: Iterable[str], base_dir: Path) -> Path | None:
+@@ -311,12 +339,14 @@ def score_sector(
+     return summary, rows
+ 
+ 
+-def write_markdown(path: Path, summary: pd.DataFrame, asof: str, group_label: str) -> None:
++def write_markdown(path: Path, summary: pd.DataFrame, asof: str, group_label: str, universe_scope: str) -> None:
++    scope_title = "전체시장" if universe_scope == "weekly_liquid_full_market" else "fallback 후보"
+     lines = [
+-        f"# 국장 전체종목 기반 자동 주도섹터 랭킹 ({group_label})",
++        f"# 국장 {scope_title} 자동 주도섹터 랭킹 ({group_label})",
+         "",
+         f"- 생성 시각: {asof}",
+-        f"- 방식: KR 전체 종목을 {group_label} 기준으로 묶고, 5D/20D/60D/120D 수익률, 확산도, 거래대금, 신고가 근접도, 미너비니 통과 종목 수를 점수화",
++        f"- 주도 섹터 유니버스: {universe_scope}",
++        f"- 방식: 입력 유니버스를 {group_label} 기준으로 묶고, 5D/20D/60D/120D 수익률, 확산도, 거래대금, 신고가 근접도, 미너비니 통과 종목 수를 점수화",
+         f"- 해석: 주도성은 {group_label} 전체 가격 강도이고, VCS/실적양호 수는 해당 묶음 안의 진입 후보 확인값이다.",
+         "",
+         "## 상위 섹터",
+@@ -363,12 +393,12 @@ def main() -> int:
+     output_dir = (args.output_dir or results_dir).resolve()
+     output_dir.mkdir(parents=True, exist_ok=True)
+ 
+-    universe_path = args.universe_csv or latest_file(["full_prefilter_ma_*.csv"], results_dir)
+-    if universe_path is None:
+-        raise FileNotFoundError("No full_prefilter_ma CSV found.")
++    universe_path, universe_scope = resolve_leadership_universe(args.universe_csv, results_dir)
++    print(f"[leadership] universe={universe_path} scope={universe_scope}")
+     universe = pd.read_csv(universe_path)
+     universe = universe[universe.get("market", "").astype(str).eq("KR")].copy()
+-    universe = universe[universe.get("has_data", True).astype(str).str.lower().isin(["true", "1"])].copy()
++    if "has_data" in universe.columns:
++        universe = universe[universe["has_data"].astype(str).str.lower().isin(["true", "1"])].copy()
+     if "base_prefilter_pass" in universe.columns:
+         universe = universe[universe["base_prefilter_pass"].astype(str).str.lower().isin(["true", "1"])].copy()
+     elif "prefilter_pass" in universe.columns:
+@@ -412,6 +442,8 @@ def main() -> int:
+         ["practical_leadership_score", "leadership_score", "avg_ret_20d"],
+         ascending=[False, False, False],
+     )
++    summary_df["leadership_universe_scope"] = universe_scope
++    summary_df["leadership_universe_path"] = str(universe_path)
+     member_df = pd.DataFrame(member_rows)
+ 
+     asof = datetime.now().strftime("%Y-%m-%d %H:%M")
+@@ -431,7 +463,7 @@ def main() -> int:
+     except Exception:
+         pass
+     group_label = args.group_label or args.group_column
+-    write_markdown(markdown, summary_df, asof, group_label)
++    write_markdown(markdown, summary_df, asof, group_label, universe_scope)
+ 
+     print(f"summary_csv={summary_csv}")
+     print(f"members_csv={members_csv}")
+diff --git a/scripts/build_market_briefing.py b/scripts/build_market_briefing.py
+index 7af552a..4cf6359 100755
+--- a/scripts/build_market_briefing.py
++++ b/scripts/build_market_briefing.py
+@@ -17,6 +17,7 @@ from build_deep_minervini_briefing import (
+     market_snapshot,
+     score_market,
+ )
++from briefing_logic_v2 import canonical_practical_candidates
+ from build_whole_market_briefings import (
+     add_kr_detail_leadership,
+     add_kr_theme_leadership,
+@@ -31,6 +32,7 @@ from build_whole_market_briefings import (
+     sector_line,
+     us_stock_line,
+ )
++from candidate_enrichment_v2 import prepare_candidates
+ 
+ 
+ def read_csv(path: Path | None) -> pd.DataFrame:
+@@ -53,6 +55,13 @@ def write_kr_briefing(args: argparse.Namespace) -> Path:
+     sector = read_csv(args.sector_csv)
+     theme_sector = read_csv(args.theme_sector_csv)
+     detail_sector = read_csv(args.detail_sector_csv)
++    stocks = prepare_candidates(
++        stocks,
++        leadership=sector,
++        rs_cache_path=args.output_md.parent / "candidate_rs_kr_cache.csv",
++        fetch_rs=not args.skip_rs_enrichment,
++    )
++    stocks.to_csv(args.stocks_csv, index=False, encoding="utf-8-sig")
+     points, grade, reasons = market_grade("kr", stocks)
+     ranked = add_kr_detail_leadership(add_kr_theme_leadership(rank_kr(stocks, sector), theme_sector), detail_sector)
+ 
+@@ -61,12 +70,16 @@ def write_kr_briefing(args: argparse.Namespace) -> Path:
+     detail_candidates = load_member_candidates(member_file_for(args.detail_sector_csv)) if args.detail_sector_csv else {}
+ 
+     output = args.output_md
++    candidate_scope_label = "daily watchlist 후보" if "watchlist" in args.scan_scope.lower() else "whole-market 후보"
++    leadership_scope = clean(sector.get("leadership_universe_scope", pd.Series(["unknown"])).iloc[0]) if not sector.empty else "unknown"
++    scope_title = "독립 주간 liquid universe" if "fresh" in leadership_scope else ("오래된 주간 유니버스 캐시(주의)" if "stale" in leadership_scope else "후보군 기반 fallback(전체시장 아님)")
+     lines: list[str] = [
+-        f"# {args.prefix} {args.origin} 국장 브리핑",
++        f"# {args.prefix} {args.origin} 국장 {candidate_scope_label} 브리핑",
+         "",
+         f"- 생성 시각: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+         f"- 시장 판단: {grade}",
+         f"- 실행 범위: {args.scan_scope}",
++        f"- 후보 유니버스: {candidate_scope_label}; 주도 섹터 유니버스: {leadership_scope}",
+         "- 기준: VCS >= 45, ATRP >= 2, deep-minervini balanced, KR/US 공통 MA50 하단 10% 이내 허용",
+         "- 추천 기준: recommend_score와 is_practical_recommendation으로 실전 추천 후보를 우선 표시",
+         "- 성격: 자동 초안 / 검토 필요. 추천·분류 로직은 베타이며 바이오/적자/고위험 후보는 별도 검증 전까지 즉시매수 후보로 보지 않는다.",
+@@ -82,7 +95,7 @@ def write_kr_briefing(args: argparse.Namespace) -> Path:
+     lines.append("판단 근거:")
+     for reason in reasons[:8]:
+         lines.append(f"- {reason}")
+-    lines += ["", "## 전체시장 주도 섹터", ""]
++    lines += ["", f"## {scope_title} 주도 섹터", ""]
+     for _, row in sector.head(10).iterrows():
+         lines.append(sector_line(row, candidates))
+     if not theme_sector.empty:
+@@ -94,8 +107,14 @@ def write_kr_briefing(args: argparse.Namespace) -> Path:
+         for _, row in detail_sector.head(10).iterrows():
+             lines.append(sector_line(row, detail_candidates))
+     lines += ["", "## 실전 추천 후보 Top", ""]
+-    for i, (_, row) in enumerate(ranked.head(args.top_n).iterrows(), start=1):
++    practical = canonical_practical_candidates(ranked, limit=args.top_n)
++    for i, (_, row) in enumerate(practical.iterrows(), start=1):
+         lines.append(kr_stock_line(i, row))
++    if practical.empty:
++        lines.append("실전 추천 하드 게이트를 통과한 후보가 없다. 관찰 후보로 순위를 채우지 않는다.")
++    lines += ["", "## 관찰 후보", ""]
++    for _, row in ranked[~ranked["is_practical_recommendation"].map(lambda value: str(value).lower() == "true")].head(args.top_n).iterrows():
++        lines.append(f"- {clean(row.get('stock_name'))}({clean(row.get('symbol'))}): {clean(row.get('recommend_reason'))}")
+     lines += [
+         "",
+         "## 운영 메모",
+@@ -110,17 +129,28 @@ def write_kr_briefing(args: argparse.Namespace) -> Path:
+ def write_us_briefing(args: argparse.Namespace) -> Path:
+     stocks = read_csv(args.stocks_csv)
+     sector = read_csv(args.sector_csv)
++    stocks = prepare_candidates(
++        stocks,
++        leadership=sector,
++        rs_cache_path=args.output_md.parent / "candidate_rs_us_cache.csv",
++        fetch_rs=not args.skip_rs_enrichment,
++    )
++    stocks.to_csv(args.stocks_csv, index=False, encoding="utf-8-sig")
+     points, grade, reasons = market_grade("us", stocks)
+     ranked = rank_us(stocks, sector)
+     candidates = load_member_candidates(member_file_for(args.sector_csv))
+ 
+     output = args.output_md
++    candidate_scope_label = "daily watchlist 후보" if "watchlist" in args.scan_scope.lower() else "whole-market 후보"
++    leadership_scope = clean(sector.get("leadership_universe_scope", pd.Series(["unknown"])).iloc[0]) if not sector.empty else "unknown"
++    scope_title = "독립 주간 liquid universe" if "fresh" in leadership_scope else ("오래된 주간 유니버스 캐시(주의)" if "stale" in leadership_scope else "후보군 기반 fallback(전체시장 아님)")
+     lines: list[str] = [
+-        f"# {args.prefix} {args.origin} 미장 브리핑",
++        f"# {args.prefix} {args.origin} 미장 {candidate_scope_label} 브리핑",
+         "",
+         f"- 생성 시각: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+         f"- 시장 판단: {grade}",
+         f"- 실행 범위: {args.scan_scope}",
++        f"- 후보 유니버스: {candidate_scope_label}; 주도 섹터 유니버스: {leadership_scope}",
+         "- 기준: VCS >= 45, ATRP >= 2, deep-minervini balanced, KR/US 공통 MA50 하단 10% 이내 허용",
+         "- 추천 기준: recommend_score와 is_practical_recommendation으로 실전 추천 후보를 우선 표시",
+         "- 성격: 자동 초안 / 검토 필요. 추천·분류 로직은 베타이며 바이오/적자/고위험 후보는 별도 검증 전까지 즉시매수 후보로 보지 않는다.",
+@@ -136,12 +166,18 @@ def write_us_briefing(args: argparse.Namespace) -> Path:
+     lines.append("판단 근거:")
+     for reason in reasons[:8]:
+         lines.append(f"- {reason}")
+-    lines += ["", "## 전체시장 주도 섹터", ""]
++    lines += ["", f"## {scope_title} 주도 섹터", ""]
+     for _, row in sector.head(10).iterrows():
+         lines.append(sector_line(row, candidates))
+     lines += ["", "## 실전 추천 후보 Top", ""]
+-    for i, (_, row) in enumerate(ranked.head(args.top_n).iterrows(), start=1):
++    practical = canonical_practical_candidates(ranked, limit=args.top_n)
++    for i, (_, row) in enumerate(practical.iterrows(), start=1):
+         lines.append(us_stock_line(i, row))
++    if practical.empty:
++        lines.append("실전 추천 하드 게이트를 통과한 후보가 없다. 관찰 후보로 순위를 채우지 않는다.")
++    lines += ["", "## 관찰 후보", ""]
++    for _, row in ranked[~ranked["is_practical_recommendation"].map(lambda value: str(value).lower() == "true")].head(args.top_n).iterrows():
++        lines.append(f"- {clean(row.get('stock_name'))}({clean(row.get('symbol'))}): {clean(row.get('recommend_reason'))}")
+     lines += [
+         "",
+         "## 운영 메모",
+@@ -165,6 +201,7 @@ def parse_args() -> argparse.Namespace:
+     parser.add_argument("--origin", default="CODEX")
+     parser.add_argument("--top-n", type=int, default=10)
+     parser.add_argument("--scan-scope", default="daily watchlist 기반 단독 실행")
++    parser.add_argument("--skip-rs-enrichment", action="store_true", help="Dry-run only: leave RS unavailable and fail candidates closed.")
+     return parser.parse_args()
+ 
+ 
+diff --git a/scripts/build_telegram_summary.py b/scripts/build_telegram_summary.py
+index 051d732..226fa1e 100755
+--- a/scripts/build_telegram_summary.py
++++ b/scripts/build_telegram_summary.py
+@@ -3,10 +3,17 @@ from __future__ import annotations
+ 
+ import argparse
+ import re
++import sys
+ from pathlib import Path
+ 
+ import pandas as pd
+ 
++REPO_ROOT = Path(__file__).resolve().parents[1]
++if str(REPO_ROOT) not in sys.path:
++    sys.path.insert(0, str(REPO_ROOT))
++
++from briefing_logic_v2 import canonical_practical_candidates
++
+ 
+ def clean(value: object) -> str:
+     if value is None or (isinstance(value, float) and pd.isna(value)):
+@@ -95,11 +102,7 @@ def top_sectors(df: pd.DataFrame, count: int = 5) -> list[str]:
+ def practical_candidates(df: pd.DataFrame) -> pd.DataFrame:
+     if df.empty:
+         return df
+-    if "is_practical_recommendation" not in df.columns:
+-        if "trade_stance" not in df.columns:
+-            return df
+-        return df[~df["trade_stance"].astype(str).str.contains("제외", na=False)].copy()
+-    return df[df["is_practical_recommendation"].map(truthy)].copy()
++    return canonical_practical_candidates(df)
+ 
+ 
+ def high_risk_candidates(df: pd.DataFrame) -> pd.DataFrame:
+@@ -121,15 +124,10 @@ def top_candidates(df: pd.DataFrame, count: int = 5) -> list[str]:
+     if df.empty:
+         return ["- 데이터 없음"]
+ 
+-    work = practical_candidates(df).copy()
++    work = canonical_practical_candidates(df, limit=count)
+     if work.empty:
+         return ["- 실전 추천 후보 없음. 고위험/RS/리스크 게이트를 통과한 후보가 나올 때까지 관찰 목록으로만 관리."]
+ 
+-    work["_recommend_score"] = numeric(work, "recommend_score")
+-    work["_briefing_score"] = numeric(work, "briefing_score")
+-    work["_vcs_score"] = numeric(work, "vcs_score")
+-    work = work.sort_values(["_recommend_score", "_briefing_score", "_vcs_score"], ascending=[False, False, False]).head(count)
+-
+     lines: list[str] = []
+     for idx, (_, row) in enumerate(work.iterrows(), start=1):
+         name = clean(row.get("stock_name")) or clean(row.get("name")) or clean(row.get("symbol"))
+@@ -177,6 +175,12 @@ def first_sector(df: pd.DataFrame) -> str:
+     return clean(row.get("sector")) or clean(row.get("basket_key")) or "미분류"
+ 
+ 
++def first_sector_scope(df: pd.DataFrame) -> str:
++    if df.empty or "leadership_universe_scope" not in df.columns:
++        return "미확인"
++    return clean(df.iloc[0].get("leadership_universe_scope")) or "미확인"
++
++
+ def insights(
+     market: str,
+     market_grade: str,
+@@ -195,6 +199,8 @@ def insights(
+         posture = "공격 가능 구간이지만, 확장 종목은 추격보다 눌림/재돌파 확인이 우선이다."
+     elif "선별" in market_grade:
+         posture = "선별 구간이라 주도 섹터와 손절 기준이 잡히는 종목만 좁혀 보는 편이 좋다."
++    elif any(label in market_grade for label in ("데이터 부족", "생략", "N/A", "n/a")):
++        posture = "시장 데이터가 부족해 강약 판정을 보류했다. 데이터 부재를 약세로 간주하지 않는다."
+     else:
+         posture = "방어적 구간이라 신규 진입보다 후보 관리와 현금 비중 점검이 우선이다."
+ 
+@@ -231,6 +237,7 @@ def build_summary(args: argparse.Namespace) -> str:
+         "성격: 자동 초안 / 검토 필요. 추천·분류 로직은 베타이며 바이오/적자/고위험 후보는 별도 검증 전까지 즉시매수 후보로 보지 않는다.",
+         "",
+         f"실행 범위: {args.scan_scope}",
++        f"주도 섹터 유니버스: KR {first_sector_scope(kr_sectors)} / US {first_sector_scope(us_sectors)}",
+         "",
+         f"시장 판단: {market_grade}",
+         "",
+@@ -246,9 +253,9 @@ def build_summary(args: argparse.Namespace) -> str:
+     if market in {"both", "us"}:
+         lines += ["", "US 주도섹터 요약", *top_sectors(us_sectors), "", "US 추천 Top 5", *top_candidates(us_final)]
+     if market in {"both", "kr"}:
+-        lines += ["", "KR 비주도/고위험 관찰 후보", *risk_candidate_lines(kr_final)]
++        lines += ["", "KR 관찰 후보 (고위험/검증 필요 포함)", *risk_candidate_lines(kr_final)]
+     if market in {"both", "us"}:
+-        lines += ["", "US 비주도/고위험 / 바이오텍 관찰 후보", *risk_candidate_lines(us_final)]
++        lines += ["", "US 관찰 후보 (고위험/바이오텍 포함)", *risk_candidate_lines(us_final)]
+ 
+     lines += [
+         "",
+diff --git a/scripts/build_tradingview_watchlists.py b/scripts/build_tradingview_watchlists.py
+index d48dbb8..7f383de 100755
+--- a/scripts/build_tradingview_watchlists.py
++++ b/scripts/build_tradingview_watchlists.py
+@@ -3,10 +3,17 @@ from __future__ import annotations
+ 
+ import argparse
+ import shutil
++import sys
+ from pathlib import Path
+ 
+ import pandas as pd
+ 
++REPO_ROOT = Path(__file__).resolve().parents[1]
++if str(REPO_ROOT) not in sys.path:
++    sys.path.insert(0, str(REPO_ROOT))
++
++from briefing_logic_v2 import canonical_practical_candidates
++
+ 
+ def clean(value: object) -> str:
+     if value is None or (isinstance(value, float) and pd.isna(value)):
+@@ -30,8 +37,10 @@ def ensure_columns(df: pd.DataFrame) -> pd.DataFrame:
+     for col in ["leadership_bucket", "leadership_theme", "sector_detail", "trade_stance"]:
+         if col not in out.columns:
+             out[col] = ""
+-    if "is_practical_recommendation" not in out.columns:
+-        out["is_practical_recommendation"] = True
++    required = {"is_practical_recommendation", "recommend_score"}
++    missing = sorted(required - set(out.columns))
++    if missing:
++        raise ValueError(f"candidate schema missing required practical fields: {', '.join(missing)}")
+     return out
+ 
+ 
+@@ -52,13 +61,7 @@ def write_practical_files(
+     comma_path: Path,
+     sections_path: Path,
+ ) -> None:
+-    df = ensure_columns(pd.read_csv(csv_path))
+-    df = df[df["is_practical_recommendation"].map(truthy)].copy()
+-    if "recommend_score" in df.columns:
+-        df["recommend_score"] = pd.to_numeric(df["recommend_score"], errors="coerce")
+-        if "vcs_score" not in df.columns:
+-            df["vcs_score"] = 0.0
+-        df = df.sort_values(["recommend_score", "vcs_score"], ascending=[False, False], na_position="last")
++    df = canonical_practical_candidates(ensure_columns(pd.read_csv(csv_path, encoding="utf-8-sig")))
+     rows: list[tuple[str, str]] = []
+     for _, row in df.iterrows():
+         symbol = symbol_formatter(clean(row.get("symbol")))
+@@ -79,6 +82,30 @@ def write_practical_files(
+     sections_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8-sig")
+ 
+ 
++def write_observation_files(
++    csv_path: Path,
++    symbol_formatter,
++    upload_path: Path,
++    sections_path: Path,
++) -> None:
++    df = ensure_columns(pd.read_csv(csv_path, encoding="utf-8-sig"))
++    df = df[~df["is_practical_recommendation"].map(truthy)].copy()
++    score_column = "observation_score" if "observation_score" in df.columns else "vcs_score"
++    df[score_column] = pd.to_numeric(df.get(score_column), errors="coerce")
++    df = df.sort_values([score_column, "vcs_score"], ascending=[False, False], na_position="last")
++    rows = [(section_label(row), symbol_formatter(clean(row.get("symbol")))) for _, row in df.iterrows()]
++    rows = [(section, symbol) for section, symbol in rows if symbol]
++    upload_path.write_text("\n".join(symbol for _, symbol in rows) + ("\n" if rows else ""), encoding="utf-8")
++    lines: list[str] = []
++    current = ""
++    for section, symbol in rows:
++        if section != current:
++            current = section
++            lines.append(f"# {section}")
++        lines.append(symbol)
++    sections_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8-sig")
++
++
+ def copy_upload_alias(source: Path, target: Path) -> None:
+     if not source.exists():
+         raise FileNotFoundError(f"Required source watchlist does not exist: {source}")
+@@ -125,6 +152,8 @@ def main() -> int:
+             result_dir / f"{kr_stem}_TV_sections.txt",
+             result_dir / f"{kr_stem}_all_vcs45_TV_upload.txt",
+             result_dir / f"{kr_stem}_all_earnings_good_TV_upload.txt",
++            result_dir / f"{kr_stem}_TV_observation_upload.txt",
++            result_dir / f"{kr_stem}_TV_observation_sections.txt",
+         ]
+         write_practical_files(
+             require_path(args.kr_earnings_csv, "--kr-earnings-csv"),
+@@ -135,6 +164,12 @@ def main() -> int:
+         )
+         copy_upload_alias(require_path(args.kr_vcs_txt, "--kr-vcs-txt"), kr_outputs[3])
+         copy_upload_alias(require_path(args.kr_earnings_txt, "--kr-earnings-txt"), kr_outputs[4])
++        write_observation_files(
++            require_path(args.kr_earnings_csv, "--kr-earnings-csv"),
++            kr_tv_symbol,
++            kr_outputs[5],
++            kr_outputs[6],
++        )
+         outputs.extend(kr_outputs)
+ 
+     if market in {"both", "us"}:
+@@ -144,6 +179,8 @@ def main() -> int:
+             result_dir / f"{us_stem}_TV_sections.txt",
+             result_dir / f"{us_stem}_all_vcs45_TV_upload.txt",
+             result_dir / f"{us_stem}_all_earnings_good_TV_upload.txt",
++            result_dir / f"{us_stem}_TV_observation_upload.txt",
++            result_dir / f"{us_stem}_TV_observation_sections.txt",
+         ]
+         write_practical_files(
+             require_path(args.us_earnings_csv, "--us-earnings-csv"),
+@@ -154,6 +191,12 @@ def main() -> int:
+         )
+         copy_upload_alias(require_path(args.us_vcs_txt, "--us-vcs-txt"), us_outputs[3])
+         copy_upload_alias(require_path(args.us_earnings_txt, "--us-earnings-txt"), us_outputs[4])
++        write_observation_files(
++            require_path(args.us_earnings_csv, "--us-earnings-csv"),
++            us_tv_symbol,
++            us_outputs[5],
++            us_outputs[6],
++        )
+         outputs.extend(us_outputs)
+ 
+     for path in outputs:
+diff --git a/scripts/refresh_weekly_universe.py b/scripts/refresh_weekly_universe.py
+new file mode 100755
+index 0000000..416e490
+--- /dev/null
++++ b/scripts/refresh_weekly_universe.py
+@@ -0,0 +1,337 @@
++#!/usr/bin/env python3
++"""Refresh independent liquid universes and rolling daily watchlists.
++
++This is intentionally not scheduled here.  Run it weekly before the daily
++pipeline so sector leadership is measured independently from VCS candidates.
++"""
++from __future__ import annotations
++
++import argparse
++import os
++import sys
++from datetime import datetime, timezone
++from pathlib import Path
++import tempfile
++from typing import Callable
++
++import pandas as pd
++
++REPO_ROOT = Path(__file__).resolve().parents[1]
++if str(REPO_ROOT) not in sys.path:
++    sys.path.insert(0, str(REPO_ROOT))
++
++from full_market_scan import get_kr_universe, get_us_universe
++from add_kr_detailed_theme import detail_for_row, theme_group_for_detail
++from us_sector_leadership import enrich_sector_info
++
++try:
++    import yfinance as yf
++except Exception:  # pragma: no cover
++    yf = None
++
++
++DEFAULT_MIN_SYMBOLS = 20
++DEFAULT_MIN_COVERAGE_PCT = 70.0
++
++
++def chunks(values: list[str], size: int) -> list[list[str]]:
++    return [values[index : index + size] for index in range(0, len(values), size)]
++
++
++def liquidity_rows(symbols: list[str], chunk_size: int) -> pd.DataFrame:
++    if yf is None:
++        raise RuntimeError("yfinance is required to refresh the weekly liquid universe")
++    rows: list[dict[str, object]] = []
++    groups = chunks(symbols, max(1, chunk_size))
++    for number, group in enumerate(groups, start=1):
++        print(f"[weekly-universe] prices {number}/{len(groups)} ({len(group)} symbols)")
++        try:
++            raw = yf.download(
++                group, period="3mo", interval="1d", auto_adjust=False,
++                group_by="ticker", threads=True, progress=False,
++            )
++        except Exception as exc:
++            print(f"[weekly-universe] chunk skipped: {exc}")
++            continue
++        for symbol in group:
++            if isinstance(raw.columns, pd.MultiIndex):
++                if symbol not in raw.columns.get_level_values(0):
++                    continue
++                frame = raw[symbol]
++            elif len(group) == 1:
++                frame = raw
++            else:
++                continue
++            close = pd.to_numeric(frame.get("Close"), errors="coerce")
++            volume = pd.to_numeric(frame.get("Volume"), errors="coerce")
++            valid = pd.DataFrame({"close": close, "volume": volume}).dropna().tail(20)
++            if valid.empty:
++                continue
++            rows.append(
++                {
++                    "symbol": symbol,
++                    "close": float(valid["close"].iloc[-1]),
++                    "average_dollar_volume_20d": float((valid["close"] * valid["volume"]).mean()),
++                    "liquidity_observations": len(valid),
++                }
++            )
++    return pd.DataFrame(rows)
++
++
++def validate_liquid_universe(
++    universe_size: int,
++    liquid: pd.DataFrame,
++    *,
++    min_symbols: int,
++    min_coverage_pct: float,
++) -> tuple[bool, str, float]:
++    liquid_count = len(liquid)
++    coverage_pct = (liquid_count / universe_size * 100.0) if universe_size else 0.0
++    if universe_size <= 0:
++        return False, "source universe is empty", coverage_pct
++    if liquid_count <= 0:
++        return False, "no symbols survived price/liquidity filters", coverage_pct
++    if liquid_count < min_symbols:
++        return False, f"liquid symbol count {liquid_count} is below minimum {min_symbols}", coverage_pct
++    if coverage_pct < min_coverage_pct:
++        return False, f"liquid coverage {coverage_pct:.1f}% is below minimum {min_coverage_pct:.1f}%", coverage_pct
++    return True, "ok", coverage_pct
++
++
++def _atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    with tempfile.NamedTemporaryFile("w", delete=False, dir=path.parent, encoding=encoding) as tmp:
++        tmp.write(text)
++        tmp_path = Path(tmp.name)
++    os.replace(tmp_path, path)
++
++
++def _atomic_write_csv(df: pd.DataFrame, path: Path) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    with tempfile.NamedTemporaryFile("w", delete=False, dir=path.parent, encoding="utf-8-sig", newline="") as tmp:
++        tmp_path = Path(tmp.name)
++    df.to_csv(tmp_path, index=False, encoding="utf-8-sig")
++    os.replace(tmp_path, path)
++
++
++def publish_market_snapshot(
++    market: str,
++    liquid: pd.DataFrame,
++    output_dir: Path,
++    watchlist_dir: Path,
++    stamp: str,
++    universe_size: int,
++    coverage_pct: float,
++) -> tuple[Path, Path, Path]:
++    market_key = market.lower()
++    dated = output_dir / f"{market_key}_liquid_{stamp}.csv"
++    current = output_dir / f"{market_key}_liquid_current.csv"
++    watchlist = watchlist_dir / f"{market_key}_daily_current.txt"
++    output_dir.mkdir(parents=True, exist_ok=True)
++    watchlist_dir.mkdir(parents=True, exist_ok=True)
++
++    published = liquid.copy()
++    published["universe_scope"] = "weekly_liquid_full_market"
++    published["universe_refreshed_at"] = datetime.now(timezone.utc).isoformat()
++    published["universe_symbol_count"] = universe_size
++    published["liquid_symbol_count"] = len(published)
++    published["liquidity_coverage_pct"] = round(coverage_pct, 2)
++
++    _atomic_write_csv(published, dated)
++    _atomic_write_csv(published, current)
++    _atomic_write_text(
++        watchlist,
++        "\n".join(published["symbol"].astype(str)) + ("\n" if not published.empty else ""),
++        encoding="utf-8",
++    )
++    return dated, current, watchlist
++
++
++def write_market(
++    market: str,
++    universe: pd.DataFrame,
++    output_dir: Path,
++    watchlist_dir: Path,
++    stamp: str,
++    min_dollar_volume: float,
++    min_close: float,
++    chunk_size: int,
++    metadata_workers: int,
++) -> dict[str, object]:
++    return write_market_with_loader(
++        market=market,
++        universe=universe,
++        output_dir=output_dir,
++        watchlist_dir=watchlist_dir,
++        stamp=stamp,
++        min_dollar_volume=min_dollar_volume,
++        min_close=min_close,
++        chunk_size=chunk_size,
++        metadata_workers=metadata_workers,
++        min_symbols=DEFAULT_MIN_SYMBOLS,
++        min_coverage_pct=DEFAULT_MIN_COVERAGE_PCT,
++        liquidity_source=liquidity_rows,
++    )
++
++
++def write_market_with_loader(
++    market: str,
++    universe: pd.DataFrame,
++    output_dir: Path,
++    watchlist_dir: Path,
++    stamp: str,
++    min_dollar_volume: float,
++    min_close: float,
++    chunk_size: int,
++    metadata_workers: int,
++    *,
++    min_symbols: int,
++    min_coverage_pct: float,
++    liquidity_source: Callable[[list[str], int], pd.DataFrame],
++) -> dict[str, object]:
++    market = market.upper()
++    universe = universe.copy()
++    universe_size = len(universe)
++    if universe_size == 0:
++        reason = "source universe is empty"
++        print(f"[weekly-universe] {market} refresh skipped: {reason}; existing cache preserved")
++        return {"market": market, "ok": False, "reason": reason, "universe_size": 0, "liquid_size": 0, "coverage_pct": 0.0}
++
++    try:
++        liquidity = liquidity_source(universe["symbol"].astype(str).tolist(), chunk_size)
++    except Exception as exc:
++        reason = f"liquidity fetch failed: {exc}"
++        print(f"[weekly-universe] {market} refresh skipped: {reason}; existing cache preserved")
++        return {"market": market, "ok": False, "reason": reason, "universe_size": universe_size, "liquid_size": 0, "coverage_pct": 0.0}
++
++    liquid = universe.merge(liquidity, on="symbol", how="inner")
++    liquid = liquid[
++        liquid["average_dollar_volume_20d"].ge(min_dollar_volume)
++        & liquid["close"].ge(min_close)
++        & liquid["liquidity_observations"].ge(10)
++    ].copy()
++    if market == "KR" and not liquid.empty:
++        detail = liquid.apply(detail_for_row, axis=1, result_type="expand")
++        liquid["sector_detail"] = detail[0]
++        liquid["sector_detail_reason"] = detail[1]
++        liquid["sector_theme_group"] = liquid["sector_detail"].map(theme_group_for_detail)
++    if market == "US" and not liquid.empty:
++        info = enrich_sector_info(
++            liquid["symbol"].astype(str).tolist(),
++            output_dir / "us_sector_industry_cache.csv",
++            metadata_workers,
++        )
++        liquid = liquid.drop(columns=["sector"], errors="ignore").merge(
++            info[["symbol", "sector", "industry", "source"]], on="symbol", how="left"
++        )
++    liquid = liquid.sort_values("average_dollar_volume_20d", ascending=False).reset_index(drop=True)
++
++    ok, reason, coverage_pct = validate_liquid_universe(
++        universe_size,
++        liquid,
++        min_symbols=min_symbols,
++        min_coverage_pct=min_coverage_pct,
++    )
++    if not ok:
++        print(
++            f"[weekly-universe] {market} refresh skipped: {reason}; "
++            f"universe={universe_size} liquid={len(liquid)} coverage={coverage_pct:.1f}% existing cache preserved"
++        )
++        return {
++            "market": market,
++            "ok": False,
++            "reason": reason,
++            "universe_size": universe_size,
++            "liquid_size": len(liquid),
++            "coverage_pct": round(coverage_pct, 2),
++        }
++
++    dated, current, watchlist = publish_market_snapshot(
++        market=market,
++        liquid=liquid,
++        output_dir=output_dir,
++        watchlist_dir=watchlist_dir,
++        stamp=stamp,
++        universe_size=universe_size,
++        coverage_pct=coverage_pct,
++    )
++    print(
++        f"[weekly-universe] {market} published universe={universe_size} liquid={len(liquid)} "
++        f"coverage={coverage_pct:.1f}% current={current} watchlist={watchlist}"
++    )
++    return {
++        "market": market,
++        "ok": True,
++        "reason": "published",
++        "universe_size": universe_size,
++        "liquid_size": len(liquid),
++        "coverage_pct": round(coverage_pct, 2),
++        "dated": dated,
++        "current": current,
++        "watchlist": watchlist,
++    }
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser(description="Refresh weekly liquid leadership universes and daily watchlists.")
++    parser.add_argument("--market", choices=["both", "kr", "us"], default="both")
++    parser.add_argument("--output-dir", type=Path, default=REPO_ROOT / "universes")
++    parser.add_argument("--watchlist-dir", type=Path, default=REPO_ROOT / "watchlists")
++    parser.add_argument("--chunk-size", type=int, default=300)
++    parser.add_argument("--metadata-workers", type=int, default=8)
++    parser.add_argument("--min-symbols", type=int, default=DEFAULT_MIN_SYMBOLS)
++    parser.add_argument("--min-coverage-pct", type=float, default=DEFAULT_MIN_COVERAGE_PCT)
++    parser.add_argument("--kr-min-traded-value", type=float, default=1_000_000_000)
++    parser.add_argument("--us-min-dollar-volume", type=float, default=2_000_000)
++    return parser.parse_args()
++
++
++def main() -> int:
++    args = parse_args()
++    stamp = datetime.now().strftime("%Y%m%d")
++    failures = 0
++    if args.market in {"both", "kr"}:
++        try:
++            kr_universe = get_kr_universe()
++        except Exception as exc:
++            print(f"[weekly-universe] KR universe load failed: {exc}; existing cache preserved")
++            failures += 1
++        else:
++            try:
++                result = write_market_with_loader(
++                    "KR", kr_universe, args.output_dir, args.watchlist_dir, stamp,
++                    args.kr_min_traded_value, 1_000.0, args.chunk_size, args.metadata_workers,
++                    min_symbols=args.min_symbols,
++                    min_coverage_pct=args.min_coverage_pct,
++                    liquidity_source=liquidity_rows,
++                )
++            except Exception as exc:
++                print(f"[weekly-universe] KR refresh failed unexpectedly: {exc}; existing cache preserved")
++                failures += 1
++            else:
++                failures += 0 if result.get("ok") else 1
++    if args.market in {"both", "us"}:
++        try:
++            us_universe = get_us_universe(include_etf=False)
++        except Exception as exc:
++            print(f"[weekly-universe] US universe load failed: {exc}; existing cache preserved")
++            failures += 1
++        else:
++            try:
++                result = write_market_with_loader(
++                    "US", us_universe, args.output_dir, args.watchlist_dir, stamp,
++                    args.us_min_dollar_volume, 2.0, args.chunk_size, args.metadata_workers,
++                    min_symbols=args.min_symbols,
++                    min_coverage_pct=args.min_coverage_pct,
++                    liquidity_source=liquidity_rows,
++                )
++            except Exception as exc:
++                print(f"[weekly-universe] US refresh failed unexpectedly: {exc}; existing cache preserved")
++                failures += 1
++            else:
++                failures += 0 if result.get("ok") else 1
++    return 0 if failures == 0 else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/scripts/run_daily_briefing.sh b/scripts/run_daily_briefing.sh
+index e3cb3d4..bec9748 100755
+--- a/scripts/run_daily_briefing.sh
++++ b/scripts/run_daily_briefing.sh
+@@ -6,6 +6,33 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ 
+ cd "${REPO_ROOT}"
+ 
++PRESERVED_ENV_NAMES=()
++PRESERVED_ENV_VALUES=()
++preserve_env_var() {
++  local name="$1"
++  if [[ ${!name+x} ]]; then
++    PRESERVED_ENV_NAMES+=("${name}")
++    PRESERVED_ENV_VALUES+=("${!name}")
++  fi
++}
++
++restore_preserved_env_vars() {
++  local idx name
++  for idx in "${!PRESERVED_ENV_NAMES[@]}"; do
++    name="${PRESERVED_ENV_NAMES[$idx]}"
++    export "${name}=${PRESERVED_ENV_VALUES[$idx]}"
++  done
++}
++
++for _env_name in \
++  TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID \
++  KR_WATCHLIST US_WATCHLIST MIN_SCORE CHUNK_SIZE FUND_WORKERS ORIGIN \
++  ENABLE_GDRIVE_UPLOAD GDRIVE_RCLONE_REMOTE GDRIVE_UPLOAD_PATH GDRIVE_UPLOAD_EARNINGS \
++  MARKET RUN_DATE FILE_PREFIX RESULT_DIR LOG_DIR LOG_FILE SCAN_SCOPE
++do
++  preserve_env_var "${_env_name}"
++done
++
+ if [[ -f ".env" ]]; then
+   set -a
+   # shellcheck disable=SC1091
+@@ -13,6 +40,8 @@ if [[ -f ".env" ]]; then
+   set +a
+ fi
+ 
++restore_preserved_env_vars
++
+ MARKET="${MARKET:-both}"
+ GDRIVE_UPLOAD_ONLY=0
+ while [[ $# -gt 0 ]]; do
+@@ -199,6 +228,10 @@ send_telegram_document() {
+     echo "[notify] Telegram document missing: ${document_path}"
+     return 0
+   fi
++  if [[ ! -s "${document_path}" ]]; then
++    echo "[notify] Telegram document empty; skipped: ${document_path}"
++    return 0
++  fi
+   if curl -fsS \
+     "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+     --form-string "chat_id=${TELEGRAM_CHAT_ID}" \
+@@ -266,6 +299,11 @@ google_drive_upload_files() {
+   local destination
+   destination="$(gdrive_destination)"
+   echo "[gdrive] upload target=${destination}"
++  if rclone mkdir "${destination}" >/dev/null 2>&1; then
++    echo "[gdrive] ensured folder: ${destination}"
++  else
++    echo "[gdrive] warning: unable to pre-create folder: ${destination}"
++  fi
+ 
+   local uploaded=0
+   local missing=0
+@@ -336,10 +374,10 @@ ALL_MD="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_국장_미장_미너비니심화_
+ DRAFT_MD="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_국장_미장_미너비니심화_실전브리핑_draft.md"
+ FINAL_MD="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_국장_미장_미너비니심화_실전브리핑.md"
+ FINAL_DOCX="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_국장_미장_미너비니심화_실전브리핑.docx"
+-KR_MARKET_MD="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_KR_국장_전체시장_미너비니심화_브리핑.md"
+-KR_MARKET_DOCX="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_KR_국장_전체시장_미너비니심화_브리핑.docx"
+-US_MARKET_MD="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_US_미장_전체시장_미너비니심화_브리핑.md"
+-US_MARKET_DOCX="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_US_미장_전체시장_미너비니심화_브리핑.docx"
++KR_MARKET_MD="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_KR_국장_일간_미너비니심화_브리핑.md"
++KR_MARKET_DOCX="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_KR_국장_일간_미너비니심화_브리핑.docx"
++US_MARKET_MD="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_US_미장_일간_미너비니심화_브리핑.md"
++US_MARKET_DOCX="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_US_미장_일간_미너비니심화_브리핑.docx"
+ TELEGRAM_SUMMARY="${RESULT_DIR}/${RUN_DATE}_${ORIGIN}_${MARKET_TAG}_telegram_summary.txt"
+ 
+ KR_ALL_CSV="${RESULT_DIR}/${FILE_PREFIX}_${ORIGIN}_국장_미너비니심화_MA50하단10pct_VCS후보전체.csv"
+diff --git a/tests/__init__.py b/tests/__init__.py
+new file mode 100644
+index 0000000..9cf7bae
+--- /dev/null
++++ b/tests/__init__.py
+@@ -0,0 +1 @@
++"""Regression tests for the VCS briefing pipeline."""
+diff --git a/tests/test_briefing_logic_v2.py b/tests/test_briefing_logic_v2.py
+new file mode 100644
+index 0000000..bce4d79
+--- /dev/null
++++ b/tests/test_briefing_logic_v2.py
+@@ -0,0 +1,360 @@
++from __future__ import annotations
++
++import unittest
++from pathlib import Path
++from tempfile import TemporaryDirectory
++
++import pandas as pd
++
++from briefing_logic_v2 import (
++    RecommendationPolicy,
++    assess_market_exposure,
++    canonical_practical_candidates,
++    classify_business_directness,
++    classify_earnings_quality,
++    enrich_recommendations,
++)
++from candidate_enrichment_v2 import benchmark_for_symbol, prepare_candidates
++from full_market_scan import resolve_watchlist_path
++from scripts.build_tradingview_watchlists import write_observation_files, write_practical_files
++
++
++def candidate(**overrides: object) -> dict[str, object]:
++    row: dict[str, object] = {
++        "symbol": "GOOD",
++        "market": "US",
++        "stock_name": "Good Semiconductor",
++        "sector": "Technology",
++        "sector_detail": "Semiconductors",
++        "industry": "Semiconductors",
++        "business_summary": "Designs RF and analog semiconductors for data centers.",
++        "matched_lead_sector": "Semiconductors",
++        "sector_leadership_score": 80.0,
++        "leadership_universe_scope": "weekly_liquid_full_market_fresh",
++        "business_directness": "direct",
++        "needs_sector_review": False,
++        "earnings_quality": "profitable_expansion",
++        "earnings_verified": True,
++        "earnings_age_days": 30,
++        "opm_latest_q": 18.0,
++        "opm_roll4q": 16.0,
++        "opm_roll12q": 12.0,
++        "vcs_score": 70.0,
++        "base_quality_label": "tight",
++        "rs_score": 75.0,
++        "rs_above_ma": True,
++        "rs_mom_5d": 2.0,
++        "rs_mom_21d": 5.0,
++        "rs_method": "relative_line_ema21_proxy",
++        "rs_confidence": "medium",
++        "close": 105.0,
++        "ma50": 100.0,
++        "ma50_gap_pct": 5.0,
++        "below_52w_high_pct": -8.0,
++        "atrp14": 3.0,
++        "average_dollar_volume_20d": 20_000_000.0,
++        "is_biotech_or_high_risk": False,
++        "is_loss_or_opm_distorted": False,
++    }
++    row.update(overrides)
++    return row
++
++
++class BusinessDirectnessTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self.leadership = pd.DataFrame(
++            [
++                {"sector": "Semiconductors", "leadership_score": 88.0, "leadership_grade": "주도"},
++                {"sector": "AI Infrastructure", "leadership_score": 81.0, "leadership_grade": "주도"},
++                {"sector": "Software", "leadership_score": 79.0, "leadership_grade": "강세"},
++            ]
++        )
++
++    def test_ebay_and_dbd_are_not_ai_direct_from_software_word(self) -> None:
++        rows = [
++            pd.Series(
++                {
++                    "symbol": "EBAY",
++                    "sector": "Consumer Cyclical",
++                    "industry": "Internet Retail",
++                    "business_summary": "Operates an online marketplace using software tools.",
++                }
++            ),
++            pd.Series(
++                {
++                    "symbol": "DBD",
++                    "sector": "Industrials",
++                    "industry": "Business Equipment",
++                    "business_summary": "Provides cash automation software and retail banking equipment.",
++                }
++            ),
++        ]
++
++        for row in rows:
++            result = classify_business_directness(row, self.leadership)
++            self.assertEqual(result.business_directness, "unrelated")
++            self.assertEqual(result.matched_lead_sector, "")
++            self.assertTrue(result.needs_sector_review)
++
++    def test_mtsi_is_direct_when_semiconductors_are_actually_leading(self) -> None:
++        result = classify_business_directness(
++            pd.Series(
++                {
++                    "symbol": "MTSI",
++                    "sector": "Technology",
++                    "industry": "Semiconductors",
++                    "business_summary": "Designs high-performance RF, optical and data-center semiconductors.",
++                }
++            ),
++            self.leadership,
++        )
++
++        self.assertEqual(result.business_directness, "direct")
++        self.assertEqual(result.matched_lead_sector, "Semiconductors")
++        self.assertFalse(result.needs_sector_review)
++        self.assertEqual(result.sector_leadership_score, 88.0)
++
++    def test_ambiguous_match_requires_review(self) -> None:
++        result = classify_business_directness(
++            pd.Series(
++                {
++                    "symbol": "AMB",
++                    "sector": "Technology",
++                    "industry": "Technology Services",
++                    "business_summary": "Provides next-generation technology solutions.",
++                }
++            ),
++            self.leadership,
++        )
++        self.assertTrue(result.needs_sector_review)
++        self.assertIn(result.business_directness, {"peripheral", "unrelated"})
++
++
++class EarningsQualityTests(unittest.TestCase):
++    def test_two_negative_opm_periods_are_loss_narrowing(self) -> None:
++        result = classify_earnings_quality(
++            pd.Series(
++                {
++                    "earnings_quarter": "2026Q1",
++                    "earnings_release_date": "2026-05-10",
++                    "earnings_source_type": "official",
++                    "revenue_current": 100.0,
++                    "opm_latest_q": -8.0,
++                    "opm_roll4q": -10.0,
++                    "opm_roll12q": -18.0,
++                }
++            ),
++            as_of=pd.Timestamp("2026-06-19"),
++        )
++        self.assertEqual(result.quality, "loss_narrowing")
++        self.assertTrue(result.verified)
++
++    def test_missing_or_stale_earnings_fail_closed(self) -> None:
++        missing = classify_earnings_quality(pd.Series({}), as_of=pd.Timestamp("2026-06-19"))
++        stale = classify_earnings_quality(
++            pd.Series(
++                {
++                    "earnings_quarter": "2024Q4",
++                    "earnings_release_date": "2025-02-01",
++                    "earnings_source_type": "official",
++                    "revenue_current": 100.0,
++                    "opm_latest_q": 10.0,
++                    "opm_roll4q": 9.0,
++                    "opm_roll12q": 8.0,
++                }
++            ),
++            as_of=pd.Timestamp("2026-06-19"),
++        )
++        self.assertEqual(missing.quality, "distorted_or_missing")
++        self.assertFalse(missing.verified)
++        self.assertEqual(stale.quality, "distorted_or_missing")
++        self.assertFalse(stale.verified)
++
++
++class RecommendationGateTests(unittest.TestCase):
++    def test_biotech_is_observation_only(self) -> None:
++        rows = pd.DataFrame(
++            [
++                candidate(symbol="QTTB", stock_name="Q32 Bio", industry="Biotechnology"),
++                candidate(symbol="RLYB", stock_name="Rallybio", industry="Biotechnology"),
++            ]
++        )
++        out = enrich_recommendations(rows, policy=RecommendationPolicy())
++        self.assertFalse(out["is_practical_recommendation"].any())
++        self.assertTrue(out["is_biotech_or_high_risk"].all())
++        self.assertTrue(out["recommend_bucket"].str.contains("바이오텍").all())
++
++    def test_rs_unknown_or_below_ema21_is_not_practical(self) -> None:
++        rows = pd.DataFrame(
++            [
++                candidate(symbol="UNKNOWN", rs_score=None, rs_above_ma=None),
++                candidate(symbol="BELOW", rs_above_ma=False),
++            ]
++        )
++        out = enrich_recommendations(rows)
++        self.assertFalse(out["is_practical_recommendation"].any())
++        self.assertTrue(out["recommend_reason"].str.contains("RS").all())
++
++    def test_ma50_minus_ten_percent_is_retained_but_not_immediate(self) -> None:
++        rows = pd.DataFrame([candidate(close=91.0, ma50=100.0, ma50_gap_pct=-9.0)])
++        out = enrich_recommendations(rows)
++        self.assertEqual(len(out), 1)
++        self.assertEqual(out.iloc[0]["trade_stance"], "MA50 회복 대기")
++        self.assertFalse(bool(out.iloc[0]["immediate_buy_ok"]))
++
++    def test_sector_leadership_changes_recommend_score(self) -> None:
++        rows = pd.DataFrame(
++            [
++                candidate(symbol="LEADER", sector_leadership_score=90.0),
++                candidate(symbol="LAGGARD", sector_leadership_score=70.0),
++            ]
++        )
++        out = enrich_recommendations(rows).set_index("symbol")
++        self.assertGreater(out.loc["LEADER", "recommend_score"], out.loc["LAGGARD", "recommend_score"])
++        self.assertLessEqual(out["recommend_score"].max(), 100.0)
++
++    def test_fresh_scope_and_sector_score_gate_practical(self) -> None:
++        rows = pd.DataFrame(
++            [
++                candidate(
++                    symbol="TOO_WEAK",
++                    sector_leadership_score=59.0,
++                    leadership_universe_scope="weekly_liquid_full_market_fresh",
++                ),
++                candidate(
++                    symbol="JUST_OK",
++                    sector_leadership_score=60.0,
++                    leadership_universe_scope="weekly_liquid_full_market_fresh",
++                ),
++                candidate(
++                    symbol="STALE",
++                    sector_leadership_score=90.0,
++                    leadership_universe_scope="stale_cached_market_context",
++                ),
++                candidate(
++                    symbol="FALLBACK",
++                    sector_leadership_score=90.0,
++                    leadership_universe_scope="candidate_fallback_not_full_market",
++                ),
++            ]
++        )
++        out = enrich_recommendations(rows).set_index("symbol")
++        self.assertFalse(bool(out.loc["TOO_WEAK", "is_practical_recommendation"]))
++        self.assertIn("59.0 < 60.0", str(out.loc["TOO_WEAK", "recommend_reason"]))
++        self.assertTrue(bool(out.loc["JUST_OK", "is_practical_recommendation"]))
++        self.assertFalse(bool(out.loc["STALE", "is_practical_recommendation"]))
++        self.assertIn("scope", str(out.loc["STALE", "recommend_reason"]))
++        self.assertFalse(bool(out.loc["FALLBACK", "is_practical_recommendation"]))
++        self.assertIn("scope", str(out.loc["FALLBACK", "recommend_reason"]))
++
++    def test_practical_top_does_not_backfill_observations(self) -> None:
++        rows = [candidate(symbol=f"GOOD{i}", vcs_score=70 + i) for i in range(3)]
++        rows.extend(candidate(symbol=f"OBS{i}", rs_above_ma=False, vcs_score=99 - i) for i in range(5))
++        enriched = enrich_recommendations(pd.DataFrame(rows))
++        top = canonical_practical_candidates(enriched, limit=10)
++        self.assertEqual(len(top), 3)
++        self.assertEqual(set(top["symbol"]), {"GOOD0", "GOOD1", "GOOD2"})
++
++    def test_missing_practical_column_fails_closed(self) -> None:
++        with self.assertRaises(ValueError):
++            canonical_practical_candidates(pd.DataFrame([{"symbol": "X", "recommend_score": 99.0}]))
++
++
++class MarketExposureTests(unittest.TestCase):
++    def test_missing_market_data_is_neutral_not_bearish(self) -> None:
++        result = assess_market_exposure({})
++        self.assertEqual(result.signal, "데이터 부족")
++        self.assertEqual(result.score, 0.0)
++        self.assertEqual(result.exposure_multiplier, 1.0)
++        self.assertFalse(any("약세" in reason or "감점" in reason for reason in result.reasons))
++
++
++class PipelineContractTests(unittest.TestCase):
++    def test_verified_direct_candidate_can_pass_end_to_end(self) -> None:
++        leadership = pd.DataFrame(
++            [
++                {
++                    "sector": "Semiconductors",
++                    "leadership_score": 88.0,
++                    "leadership_grade": "주도",
++                    "leadership_universe_scope": "weekly_liquid_full_market_fresh",
++                }
++            ]
++        )
++        row = candidate(
++            symbol="MTSI",
++            earnings_quarter="2026Q1",
++            earnings_release_date="2026-05-10",
++            earnings_source_type="official",
++            announced_revenue_current=100.0,
++        )
++        row.pop("business_directness")
++        row.pop("matched_lead_sector")
++        row.pop("sector_leadership_score")
++        row.pop("needs_sector_review")
++        row.pop("earnings_quality")
++        row.pop("earnings_verified")
++        out = prepare_candidates(pd.DataFrame([row]), leadership=leadership, fetch_rs=False)
++        self.assertTrue(bool(out.iloc[0]["is_practical_recommendation"]))
++        self.assertEqual(out.iloc[0]["business_directness"], "direct")
++        self.assertEqual(out.iloc[0]["earnings_quality"], "profitable_expansion")
++        self.assertEqual(out.iloc[0]["leadership_universe_scope"], "weekly_liquid_full_market_fresh")
++
++    def test_rs_benchmark_mapping(self) -> None:
++        self.assertEqual(benchmark_for_symbol("005930.KS", "KR"), ("KOSPI", None))
++        self.assertEqual(benchmark_for_symbol("247540.KQ", "KR"), ("KOSDAQ", None))
++        self.assertEqual(benchmark_for_symbol("MTSI", "US"), ("QQQ", "SPY"))
++
++    def test_rolling_watchlist_replaces_stale_dated_default(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            dated = root / "us_stage1_20260312.txt"
++            current = root / "us_daily_current.txt"
++            dated.write_text("OLD\n", encoding="utf-8")
++            current.write_text("NEW\n", encoding="utf-8")
++            self.assertEqual(resolve_watchlist_path(dated, "US"), current)
++
++    def test_custom_watchlist_is_not_overridden(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            custom = root / "my_manual_universe.txt"
++            current = root / "us_daily_current.txt"
++            custom.write_text("MANUAL\n", encoding="utf-8")
++            current.write_text("CURRENT\n", encoding="utf-8")
++            self.assertEqual(resolve_watchlist_path(custom, "US"), custom)
++
++    def test_main_and_observation_tv_files_are_disjoint(self) -> None:
++        frame = enrich_recommendations(
++            pd.DataFrame(
++                [
++                    candidate(symbol="GOOD1"),
++                    candidate(symbol="QTTB", industry="Biotechnology"),
++                ]
++            )
++        )
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            source = root / "candidates.csv"
++            main_upload = root / "main.txt"
++            main_comma = root / "main_comma.txt"
++            main_sections = root / "main_sections.txt"
++            observation_upload = root / "observation.txt"
++            observation_sections = root / "observation_sections.txt"
++            frame.to_csv(source, index=False)
++            write_practical_files(source, str, main_upload, main_comma, main_sections)
++            write_observation_files(source, str, observation_upload, observation_sections)
++            self.assertEqual(main_upload.read_text().strip(), "GOOD1")
++            self.assertNotIn("QTTB", main_sections.read_text())
++            self.assertIn("QTTB", observation_sections.read_text())
++
++    def test_tv_export_fails_when_practical_schema_is_missing(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            source = root / "bad.csv"
++            pd.DataFrame([{"symbol": "X", "recommend_score": 99.0}]).to_csv(source, index=False)
++            with self.assertRaises(ValueError):
++                write_practical_files(source, str, root / "a", root / "b", root / "c")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/test_weekly_universe_refresh.py b/tests/test_weekly_universe_refresh.py
+new file mode 100644
+index 0000000..9ef905a
+--- /dev/null
++++ b/tests/test_weekly_universe_refresh.py
+@@ -0,0 +1,223 @@
++from __future__ import annotations
++
++import unittest
++from pathlib import Path
++from tempfile import TemporaryDirectory
++from types import SimpleNamespace
++
++import pandas as pd
++
++import scripts.refresh_weekly_universe as refresh
++
++
++def universe_frame(size: int = 10) -> pd.DataFrame:
++    rows = []
++    for idx in range(size):
++        symbol = f"{idx:06d}.KS"
++        rows.append(
++            {
++                "market": "KR",
++                "symbol": symbol,
++                "stock_name": f"Name {idx}",
++                "sector": "Technology",
++            }
++        )
++    return pd.DataFrame(rows)
++
++
++def liquid_frame(symbols: list[str]) -> pd.DataFrame:
++    return pd.DataFrame(
++        [
++            {
++                "symbol": symbol,
++                "close": 1_500.0 + idx,
++                "average_dollar_volume_20d": 25_000_000.0 + idx,
++                "liquidity_observations": 20,
++            }
++            for idx, symbol in enumerate(symbols)
++        ]
++    )
++
++
++class WeeklyUniverseRefreshTests(unittest.TestCase):
++    def test_full_fetch_failure_preserves_existing_cache(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            output_dir = root / "universes"
++            watchlist_dir = root / "watchlists"
++            output_dir.mkdir()
++            watchlist_dir.mkdir()
++            current = output_dir / "kr_liquid_current.csv"
++            watchlist = watchlist_dir / "kr_daily_current.txt"
++            current.write_text("OLD\n", encoding="utf-8-sig")
++            watchlist.write_text("OLD\n", encoding="utf-8")
++            before_mtime = current.stat().st_mtime_ns
++
++            result = refresh.write_market_with_loader(
++                "KR",
++                universe_frame(),
++                output_dir,
++                watchlist_dir,
++                "20260619",
++                1_000_000_000.0,
++                1_000.0,
++                5,
++                1,
++                min_symbols=3,
++                min_coverage_pct=50.0,
++                liquidity_source=lambda symbols, chunk_size: (_ for _ in ()).throw(RuntimeError("boom")),
++            )
++
++            self.assertFalse(result["ok"])
++            self.assertEqual(current.read_text(encoding="utf-8-sig"), "OLD\n")
++            self.assertEqual(watchlist.read_text(encoding="utf-8"), "OLD\n")
++            self.assertEqual(current.stat().st_mtime_ns, before_mtime)
++
++    def test_zero_results_preserve_existing_cache(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            output_dir = root / "universes"
++            watchlist_dir = root / "watchlists"
++            output_dir.mkdir()
++            watchlist_dir.mkdir()
++            current = output_dir / "kr_liquid_current.csv"
++            watchlist = watchlist_dir / "kr_daily_current.txt"
++            current.write_text("OLD\n", encoding="utf-8-sig")
++            watchlist.write_text("OLD\n", encoding="utf-8")
++
++            result = refresh.write_market_with_loader(
++                "KR",
++                universe_frame(),
++                output_dir,
++                watchlist_dir,
++                "20260619",
++                1_000_000_000.0,
++                1_000.0,
++                5,
++                1,
++                min_symbols=3,
++                min_coverage_pct=50.0,
++                liquidity_source=lambda symbols, chunk_size: pd.DataFrame(
++                    columns=["symbol", "close", "average_dollar_volume_20d", "liquidity_observations"]
++                ),
++            )
++
++            self.assertFalse(result["ok"])
++            self.assertIn("no symbols", str(result["reason"]))
++            self.assertEqual(current.read_text(encoding="utf-8-sig"), "OLD\n")
++            self.assertEqual(watchlist.read_text(encoding="utf-8"), "OLD\n")
++
++    def test_low_coverage_preserves_existing_cache(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            output_dir = root / "universes"
++            watchlist_dir = root / "watchlists"
++            output_dir.mkdir()
++            watchlist_dir.mkdir()
++            current = output_dir / "kr_liquid_current.csv"
++            watchlist = watchlist_dir / "kr_daily_current.txt"
++            current.write_text("OLD\n", encoding="utf-8-sig")
++            watchlist.write_text("OLD\n", encoding="utf-8")
++
++            result = refresh.write_market_with_loader(
++                "KR",
++                universe_frame(size=10),
++                output_dir,
++                watchlist_dir,
++                "20260619",
++                1.0,
++                1.0,
++                5,
++                1,
++                min_symbols=1,
++                min_coverage_pct=70.0,
++                liquidity_source=lambda symbols, chunk_size: liquid_frame(symbols[:2]),
++            )
++
++            self.assertFalse(result["ok"])
++            self.assertIn("coverage", str(result["reason"]))
++            self.assertEqual(current.read_text(encoding="utf-8-sig"), "OLD\n")
++            self.assertEqual(watchlist.read_text(encoding="utf-8"), "OLD\n")
++
++    def test_success_replaces_current_and_watchlist(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            output_dir = root / "universes"
++            watchlist_dir = root / "watchlists"
++            output_dir.mkdir()
++            watchlist_dir.mkdir()
++            current = output_dir / "kr_liquid_current.csv"
++            watchlist = watchlist_dir / "kr_daily_current.txt"
++            dated = output_dir / "kr_liquid_20260619.csv"
++            current.write_text("OLD\n", encoding="utf-8-sig")
++            watchlist.write_text("OLD\n", encoding="utf-8")
++
++            universe = universe_frame(size=5)
++            symbols = universe["symbol"].astype(str).tolist()
++            result = refresh.write_market_with_loader(
++                "KR",
++                universe,
++                output_dir,
++                watchlist_dir,
++                "20260619",
++                1.0,
++                1.0,
++                5,
++                1,
++                min_symbols=3,
++                min_coverage_pct=50.0,
++                liquidity_source=lambda symbols, chunk_size: liquid_frame(symbols[:4]),
++            )
++
++            self.assertTrue(result["ok"])
++            self.assertTrue(dated.exists())
++            self.assertTrue(current.exists())
++            self.assertTrue(watchlist.exists())
++            self.assertEqual(watchlist.read_text(encoding="utf-8"), "\n".join(reversed(symbols[:4])) + "\n")
++            published = pd.read_csv(current, encoding="utf-8-sig")
++            self.assertEqual(len(published), 4)
++            self.assertIn("weekly_liquid_full_market", set(published["universe_scope"].astype(str)))
++            self.assertGreater(float(published["liquidity_coverage_pct"].iloc[0]), 0.0)
++
++    def test_main_continues_after_one_market_failure(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            calls: list[str] = []
++            original_parse_args = refresh.parse_args
++            original_write = refresh.write_market_with_loader
++            original_get_kr = refresh.get_kr_universe
++            original_get_us = refresh.get_us_universe
++            try:
++                refresh.parse_args = lambda: SimpleNamespace(
++                    market="both",
++                    output_dir=root / "universes",
++                    watchlist_dir=root / "watchlists",
++                    chunk_size=5,
++                    metadata_workers=1,
++                    min_symbols=1,
++                    min_coverage_pct=0.0,
++                    kr_min_traded_value=1_000_000_000.0,
++                    us_min_dollar_volume=2_000_000.0,
++                )
++                refresh.get_kr_universe = lambda: universe_frame(size=2)
++                refresh.get_us_universe = lambda include_etf=False: universe_frame(size=2)
++
++                def fake_write_market(*args, **kwargs):
++                    market = str(args[0])
++                    calls.append(market)
++                    return {"ok": market != "KR"}
++
++                refresh.write_market_with_loader = fake_write_market
++                rc = refresh.main()
++            finally:
++                refresh.parse_args = original_parse_args
++                refresh.write_market_with_loader = original_write
++                refresh.get_kr_universe = original_get_kr
++                refresh.get_us_universe = original_get_us
++
++            self.assertEqual(calls, ["KR", "US"])
++            self.assertEqual(rc, 1)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/us_sector_leadership.py b/us_sector_leadership.py
+index caa7cfb..9b30132 100644
+--- a/us_sector_leadership.py
++++ b/us_sector_leadership.py
+@@ -28,6 +28,34 @@ from sector_leadership import (
+ 
+ DEFAULT_RESULTS_DIR = Path("..") / "data" / "vcs_results"
+ US_BENCHMARKS = {"US": "SPY"}
++REPO_ROOT = Path(__file__).resolve().parent
++
++
++def resolve_leadership_universe(requested: Path | None, results_dir: Path) -> tuple[Path, str]:
++    weekly = REPO_ROOT / "universes" / "us_liquid_current.csv"
++    if weekly.exists():
++        try:
++            import pandas as pd
++            from datetime import datetime, timezone
++            sample = pd.read_csv(weekly, nrows=1)
++            refreshed_str = sample.get("universe_refreshed_at")
++            if refreshed_str is not None and not refreshed_str.empty and not pd.isna(refreshed_str.iloc[0]):
++                refreshed = pd.to_datetime(refreshed_str.iloc[0], utc=True)
++                age_days = (datetime.now(timezone.utc) - refreshed).days
++                if age_days <= 10:
++                    return weekly, "weekly_liquid_full_market_fresh"
++                elif age_days <= 21:
++                    return weekly, "stale_cached_market_context"
++                # If older than 21 days, fall through to fallback
++            else:
++                return weekly, "weekly_liquid_full_market_fresh"
++        except Exception as e:
++            print(f"[leadership] freshness check failed: {e}")
++            return weekly, "weekly_liquid_full_market_fresh"
++    fallback = requested or latest_file(["full_prefilter_ma_*.csv"], results_dir)
++    if fallback is None:
++        raise FileNotFoundError("No US weekly liquid universe. Run scripts/refresh_weekly_universe.py first.")
++    return fallback, "candidate_fallback_not_full_market"
+ 
+ 
+ def latest_file(patterns: Iterable[str], base_dir: Path) -> Path | None:
+@@ -322,11 +350,12 @@ def score_group(
+     return summary, rows
+ 
+ 
+-def write_markdown(path: Path, summary: pd.DataFrame, asof: str) -> None:
++def write_markdown(path: Path, summary: pd.DataFrame, asof: str, universe_scope: str) -> None:
+     lines: list[str] = []
+     lines.append("# 미장 자동 주도섹터 랭킹")
+     lines.append("")
+     lines.append(f"- 생성 시각: {asof}")
++    lines.append(f"- 주도 섹터 유니버스: {universe_scope}")
+     lines.append("- 방식: Yahoo Finance 산업군별 5D/20D 수익률, 확산도, 거래대금, 신고가 근접도, 미너비니 통과 종목 수를 점수화")
+     lines.append("- 해석: 섹터 주도성은 산업군 전체 가격 강도이고, VCS/실적양호 수는 해당 산업군 안의 진입 후보 확인값이다.")
+     lines.append("")
+@@ -381,16 +410,21 @@ def main() -> int:
+     output_dir = (args.output_dir or results_dir).resolve()
+     output_dir.mkdir(parents=True, exist_ok=True)
+ 
+-    universe_path = args.universe_csv or args.all_csv or latest_file(["full_prefilter_ma_*.csv"], results_dir)
+-    if universe_path is None:
+-        raise FileNotFoundError("No US full_prefilter_ma CSV found.")
++    universe_path, universe_scope = resolve_leadership_universe(args.universe_csv or args.all_csv, results_dir)
++    print(f"[leadership] universe={universe_path} scope={universe_scope}")
+     universe_df = pd.read_csv(universe_path)
+     universe_df = universe_df[universe_df.get("market", "").astype(str).eq("US")].copy()
+-    universe_df = universe_df[universe_df.get("has_data", True).astype(str).str.lower().isin(["true", "1"])].copy()
++    if "has_data" in universe_df.columns:
++        universe_df = universe_df[universe_df["has_data"].astype(str).str.lower().isin(["true", "1"])].copy()
+     symbols = universe_df["symbol"].dropna().astype(str).drop_duplicates().tolist()
+ 
+     cache_path = args.cache_csv or (results_dir / "us_yahoo_sector_industry_cache.csv")
+-    info = enrich_sector_info(symbols, cache_path, args.info_workers)
++    if "industry" in universe_df.columns and universe_df["industry"].fillna("").astype(str).str.len().gt(0).all():
++        info = universe_df[[column for column in ("symbol", "sector", "industry", "source") if column in universe_df.columns]].copy()
++        if "source" not in info.columns:
++            info["source"] = "weekly_universe_cache"
++    else:
++        info = enrich_sector_info(symbols, cache_path, args.info_workers)
+     universe = universe_df.merge(info, on="symbol", how="left", suffixes=("", "_yahoo"))
+     if "sector_yahoo" in universe.columns:
+         universe["sector"] = universe["sector_yahoo"].combine_first(universe.get("sector"))
+@@ -418,6 +452,8 @@ def main() -> int:
+         member_rows.extend(rows)
+ 
+     summary_df = pd.DataFrame(summary_rows).sort_values(["leadership_score", "avg_ret_20d"], ascending=[False, False])
++    summary_df["leadership_universe_scope"] = universe_scope
++    summary_df["leadership_universe_path"] = str(universe_path)
+     member_df = pd.DataFrame(member_rows)
+ 
+     asof = datetime.now().strftime("%Y-%m-%d %H:%M")
+@@ -436,7 +472,7 @@ def main() -> int:
+             member_df.to_excel(writer, index=False, sheet_name="members")
+     except Exception:
+         pass
+-    write_markdown(markdown, summary_df, asof)
++    write_markdown(markdown, summary_df, asof, universe_scope)
+ 
+     print(f"summary_csv={summary_csv}")
+     print(f"members_csv={members_csv}")
