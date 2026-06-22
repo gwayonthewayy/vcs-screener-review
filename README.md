@@ -17,6 +17,7 @@ This public repository contains a review-only bundle for a private project. It i
 - `DRY_RUN_EVIDENCE.md`: KR/US/both dry-run evidence
 - `BRIEFING_LOGIC_V2.md`: V2 selection policy
 - `AUTOMATION.md`: automation call-path documentation
+- `FINAL_REPORT.md`: single-file final report for the web reviewer
 - `review.patch`: latest binary-capable diff from base to feature, excluding the older embedded review patch
 - `WEB_REVIEW_PROMPT.md`: ready-to-use review request
 
