@@ -57,7 +57,7 @@ It summarizes the private feature branch, the validation result, and the publish
 - SHA-256: `23995321946ccdbea85154ee7de1fd72200f0303e56af8079da19e7df90f70bb`
 
 10. 원본 feature 최종 commit SHA
-`9feef98b7f3a2ed92f988ccfe42a7d1b0cf51728`
+`13222251f9dd8d434f1071ffbc24d53b9c084215`
 
 11. 공개 review repo commit SHA
 `07158e61f30d014a9c7f4af6cf06b7cb5409c8b8`
