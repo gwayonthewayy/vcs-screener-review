@@ -36,24 +36,25 @@ watchlists/us_daily_current.txt
 
 The scanner automatically prefers a newer `*_daily_current.txt` over the legacy dated default path. This task does not register or modify cron.
 
-The weekly refresh requires explicit source provenance before liquidity processing. KR requires successful KOSPI and KOSDAQ sources. US requires successful NASDAQ, NYSE, and NYSE American sources. A missing or failed required source rejects the entire market refresh; symbol-count heuristics cannot convert a partial fetch into a valid snapshot.
+The weekly refresh requires explicit source provenance before liquidity processing. KR requires successful KOSPI and KOSDAQ sources. US requires successful NASDAQ, NYSE, and NYSE American sources. A missing or failed required source rejects the entire market refresh; symbol-count heuristics cannot convert a partial fetch into a valid snapshot. Snapshot metadata is validated row by row. `market`, `universe_scope`, `universe_refreshed_at`, `universe_symbol_count`, `liquid_symbol_count`, `liquidity_coverage_pct`, `universe_required_sources`, `universe_source_status`, `universe_required_source_count`, and `universe_successful_source_count` must be non-null, stripped, and identical across every row. `symbol` must be non-null, non-empty, stripped, and unique. Partial rows, blank metadata, or mixed metadata invalidate the snapshot and force `candidate_fallback_not_full_market`.
 
 Fresh cache validation is shared by KR and US and requires all of the following:
 
 - non-empty CSV and complete snapshot schema
+- every required metadata field present on every row
 - `universe_scope == weekly_liquid_full_market`
 - one parseable, non-future `universe_refreshed_at`
 - timestamp within the configured freshness window
 - internally consistent universe/liquid counts and coverage percentage
 - complete required-source list and successful source-status metadata
 
-Missing, malformed, future, expired, or internally inconsistent metadata is never labeled fresh. Valid snapshots older than the fresh window may be used only as `stale_cached_market_context`; malformed or expired snapshots fall back to candidate context and cannot produce practical recommendations.
+Missing, malformed, future, expired, blank, or internally inconsistent metadata is never labeled fresh. Valid snapshots older than the fresh window may be used only as `stale_cached_market_context`; malformed, partial, or expired snapshots fall back to candidate context and cannot produce practical recommendations.
 
 Publishing is transactional at the snapshot-set level. Dated CSV, current CSV, and daily watchlist are staged and validated before replacement. Publish order is dated, watchlist, then current; current is the final commit marker. Any intermediate failure restores the prior current/watchlist generation and cleans temporary files. A failed KR refresh never overwrites the US cache, and vice versa.
 
 ## Business directness
 
-`business_directness` is one of `direct`, `adjacent`, `peripheral`, or `unrelated`. A company can be `direct` only when primary evidence (structured `industry`/business tags or a concrete business description) matches a sector present in the current leadership result. `theme_hint`, generic sector names, and derived theme labels are auxiliary evidence only and cannot independently produce `direct`. Generic words such as `software`, `technology`, or `solutions` are not direct AI evidence. Ambiguous and auxiliary-only matches set `needs_sector_review=True` and remain observation-only.
+`business_directness` is one of `direct`, `adjacent`, `peripheral`, or `unrelated`. A company can be `direct` only when structured `industry`/business tags clearly match a current leader, or when the business description itself describes the company’s own product, technology, or service in that sector. Customer-only phrasing such as `serves semiconductor manufacturers`, `customers include semiconductor companies`, `logistics for chip makers`, `insurance products for data-center operators`, or `consulting to semiconductor companies` does not qualify as direct. `theme_hint`, generic sector names, and derived theme labels are auxiliary evidence only and cannot independently produce `direct`. Generic words such as `software`, `technology`, or `solutions` are not direct AI evidence. Ambiguous and auxiliary-only matches set `needs_sector_review=True` and remain observation-only.
 
 The practical gate also requires `leadership_universe_scope == weekly_liquid_full_market_fresh` and `sector_leadership_score >= 60`. Stale cached context and candidate fallback stay in observation mode even if the business match itself looks strong.
 
@@ -78,7 +79,7 @@ The candidate CSV stores announced quarter, release date, source type and age in
 - `loss_narrowing`
 - `distorted_or_missing`
 
-Missing, stale, future-dated or non-verifiable data fails closed. The quarter must parse, must not end after the release date, and must be plausibly linked to that release. The release source must be official or provisional. Release timestamps are compared to `as_of` without day-level truncation; a later timestamp on the same date is still future. A future release retains its date and negative age for diagnostics but is `distorted_or_missing` with `earnings_verified=False`. When both one-year and three-year OPM are negative, improvement is `loss_narrowing`, not profitable expansion.
+Missing, stale, future-dated or non-verifiable data fails closed. The quarter must parse, must not end after the release date, and must be plausibly linked to that release. The release source must be one of the explicit allowlist values: `official`, `provisional`, `preliminary`, `dart_filing_date`, `dart_provisional_fair_disclosure`, `sec_filing_date`, `공식`, or `잠정`. Release timestamps are compared to `as_of` without day-level truncation; a later timestamp on the same date is still future. A future release retains its date and negative age for diagnostics but is `distorted_or_missing` with `earnings_verified=False`. Any source outside the exact allowlist, including substring lookalikes such as `unofficial`, `secondary estimate`, or `unofficial preliminary data`, fails closed. When both one-year and three-year OPM are negative, improvement is `loss_narrowing`, not profitable expansion.
 
 ## Recommendation gate and score
 
@@ -107,4 +108,4 @@ Sector plus directness is capped at 25 and earnings plus OPM at 35 by constructi
 
 Build summaries and TradingView files directly in a temporary directory. Do not invoke Telegram `sendMessage`/`sendDocument` or rclone during logic rehearsals. The production automation, cron entries and delivery credentials are outside this logic change.
 
-The frozen positive fixture verifies three practical symbols in identical Markdown, Telegram, and TradingView order, disjoint observation output, and no observation backfill when practical count is zero.
+The frozen positive fixture verifies three practical symbols in identical Markdown, Telegram, and TradingView order, disjoint observation output, and no observation backfill when practical count is zero. A builder-level fixture also exercises `scripts/build_market_briefing.py` against real temporary files to confirm the same selector order reaches Markdown, Telegram Top, and TradingView main outputs. The current regression set reaches the real file I/O path and the full suite contains 55 tests.

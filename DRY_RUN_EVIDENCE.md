@@ -49,6 +49,20 @@ LSCC
 | Telegram Top | `MTSI`, `SMTC`, `LSCC` |
 | TradingView main upload | `MTSI`, `SMTC`, `LSCC` |
 
+## Builder-Level Positive Fixture
+
+The `test_builder_level_fresh_positive_fixture_keeps_order_and_disjoint_outputs` fixture goes through the real builder path with temporary on-disk files.
+
+Observed properties:
+
+- fresh leadership scope is preserved
+- verified earnings and direct business evidence survive through the builder
+- the same practical symbol order reaches Markdown, Telegram Top, and TradingView main output
+- practical and observation TradingView sets remain disjoint
+- builder output does not backfill observations when the practical set is empty
+
+This gives file-I/O evidence for the canonical selector path without invoking Telegram or Google Drive delivery.
+
 Observation fixtures include high-risk biotech and below-EMA21 RS cases. The TradingView practical/observation intersection is empty. The separate zero-practical fixture confirms Telegram emits only the no-practical message and does not promote observations.
 
 ## Negative E2E Boundaries
@@ -61,6 +75,7 @@ Observation fixtures include high-risk biotech and below-EMA21 RS cases. The Tra
 - Publish failure between watchlist and current: rollback restores the old generation.
 - Future earnings release: unverified `distorted_or_missing`.
 - Theme-only semiconductor hint: review-only, not direct.
+- Customer-only business phrasing: review-only, not direct.
 
 ## Remaining Production Limitation
 

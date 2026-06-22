@@ -17,7 +17,7 @@ Verify at minimum:
 7. Observation candidates cannot fill practical Top slots and practical/observation TV files cannot overlap.
 8. N/A market data is not treated as bearish.
 9. Environment precedence, zero-byte Telegram attachment skipping, and non-fatal rclone upload behavior do not expose secrets or break briefing completion.
-10. The latest evidence set contains 44 passing tests, not 24.
+10. The latest evidence set contains 55 passing tests, not 24.
 
 Report findings first, ordered Critical/High/Medium/Low. For every finding provide file and line, triggering condition, impact, and a concrete fix direction. Then list merge blockers, non-blocking improvements, test gaps, and one verdict: `Ready to merge`, `Ready after fixes`, or `Not ready`.
 

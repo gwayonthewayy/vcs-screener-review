@@ -7,7 +7,7 @@ This public repository contains a review-only bundle for a private project. It i
 - Base branch: `main`
 - Base commit: `107103b7520437ab9bacd4c76ed669feaa93f613`
 - Feature branch: `fix/briefing-logic-v2`
-- Feature commit: `43e0696a32f8968125d8afb58a8d37bbde9c0614`
+- Feature commit: `9feef9810d28dce0ad0ee58e5c8d0ee8dfef8c7b`
 - Generated: 2026-06-22
 
 ## Files
