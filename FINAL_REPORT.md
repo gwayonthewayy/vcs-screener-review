@@ -54,13 +54,16 @@ It summarizes the private feature branch, the validation result, and the publish
 
 9. `review.patch`의 `cmp` 및 SHA-256 검증 결과
 - private diff와 byte-for-byte 동일
-- SHA-256: `23995321946ccdbea85154ee7de1fd72200f0303e56af8079da19e7df90f70bb`
+- SHA-256: `4d0f81356134e5ca1dc027c471bcb4360f9116a702ff4b54c3d2d0e23966da0f`
 
 10. 원본 feature 최종 commit SHA
 `13222251f9dd8d434f1071ffbc24d53b9c084215`
 
-11. 공개 review repo commit SHA
+11. 공개 review bundle 생성 기준 commit SHA
 `07158e61f30d014a9c7f4af6cf06b7cb5409c8b8`
+
+- 이 값은 bundle 생성 기준 커밋이며, 공개 저장소의 최신 tip을 뜻하지 않는다.
+- 공개 저장소 tip은 검증 시점의 Git 결과로 별도 보고하며 문서에 자기 자신의 SHA를 기록하지 않는다.
 
 12. 두 repo의 clean 상태
 - private repo: clean
