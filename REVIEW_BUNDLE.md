@@ -33,7 +33,7 @@ Key operating rules:
 
 - Branch: `fix/briefing-logic-v2`
 - Base commit: `107103b7520437ab9bacd4c76ed669feaa93f613`
-- Current branch tip at review start: `5bda406d74c474f42ddf3695e662a6a955573c55`
+- Current branch tip at review start: `43e0696a32f8968125d8afb58a8d37bbde9c0614`
 
 ## Scope
 
@@ -55,6 +55,8 @@ The work focuses on the briefing selection pipeline, weekly universe safety, and
 | `scripts/build_telegram_summary.py` | Emits Telegram summaries from the same canonical practical selector. |
 | `tests/test_briefing_logic_v2.py` | Unit and pipeline-contract coverage for the V2 selection contract. |
 | `tests/test_weekly_universe_refresh.py` | Cache-preservation tests for weekly refresh failures and low-coverage cases. |
+| `weekly_universe_cache.py` | Shared strict weekly snapshot schema, freshness, count/coverage, and source-provenance validation. |
+| `tests/test_weekly_universe_cache.py` | Missing/malformed/future/stale metadata and KR title regression coverage. |
 | `docs/briefing_logic_v2.md` | Selection-policy documentation and operational notes. |
 | `docs/automation.md` | Run-mode and cron documentation, including the VCS threshold wording fix. |
 | `install.cmd` | Deleted Windows-specific artifact that is not part of the Linux server automation path. |
@@ -107,8 +109,9 @@ Weekly leadership is independent from the daily scan universe.
 The practical gate only accepts fresh leadership scope.
 Fallback leadership is allowed for observation and diagnostics but must not be treated as full-market leadership.
 
-The weekly refresh script writes to temporary files first and only swaps cache files into place after validation.
-If refresh fails, the existing cache is preserved.
+The weekly refresh requires explicit source provenance: KOSPI and KOSDAQ for KR; NASDAQ, NYSE, and NYSE American for US. Any missing/failed required source rejects the market refresh before liquidity processing.
+
+The weekly refresh stages and validates the dated CSV, current CSV, and daily watchlist as one generation. It publishes current last as the commit marker and rolls back current/watchlist/dated files on intermediate failure. If refresh fails, the existing generation is preserved.
 
 ## Daily Watchlist vs Whole-Market Leadership
 
@@ -192,6 +195,11 @@ Market-specific behavior:
 - QTTB / RLYB style biotech names are observation-only.
 - RS unknown or below EMA21 is practical-fail closed.
 - The weekly refresh no longer overwrites a good cache on DNS / fetch failures or low-coverage refreshes.
+- Missing, malformed, future, wrong-scope, count-inconsistent, or source-incomplete weekly metadata can no longer be labeled fresh.
+- Partial KOSPI/KOSDAQ or US core-exchange refreshes cannot replace the current cache.
+- Snapshot publish failure between watchlist and current replacement rolls back the whole generation.
+- Future earnings releases fail closed, and theme-only labels cannot independently create direct business classification.
+- KR fresh scope now renders the full-market title using the canonical fresh constant.
 - The VCS threshold wording is now consistent at 45.
 - Windows-only `install.cmd` is removed from the Linux server review path.
 
@@ -199,7 +207,7 @@ Market-specific behavior:
 
 - Fresh production weekly universe refresh is not yet validated on live network data in this workspace.
 - Current local state still has no weekly current cache, so the present dry-run is fail-closed and practical count is 0.
-- Positive-path practical recommendations are covered by unit tests, but not by a live fresh-cache production run in this workspace.
+- Positive-path practical recommendations and cross-output ordering are covered by a frozen E2E fixture, but not by a live fresh-cache production run in this workspace.
 
 ## Main Merge Checklist
 
