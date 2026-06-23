@@ -197,5 +197,7 @@ The v2 briefing pipeline now applies the practical-vs-observation split in code 
 - VCS is standardized at `45`.
 - Briefings state whether they come from the daily watchlist or a whole-market leadership scan.
 - The recommendation order is explicit: `주도섹터 -> 실적 -> OPM -> VCS -> RS -> 자리/이격 -> 수급`.
+- `ANALYSIS_READY_LIQUIDITY_RATIO=0.5` is a heuristic for the analyzable-liquidity denominator; it does not bypass the 70% weekly publish gate.
+- Latest verified live positive path: KR `79.2%`, US `91.9%`, fresh snapshot consumed, Telegram/Drive no-send.
 
 If this policy changes again, update `docs/briefing_logic_v2.md` and the selection tests first, then refresh the automation notes.

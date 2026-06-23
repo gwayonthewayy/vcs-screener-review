@@ -1,6 +1,6 @@
 # VCS Screener V2 Review Bundle
 
-Date: 2026-06-22
+Date: 2026-06-23
 
 ## Review Context
 
@@ -33,12 +33,13 @@ Key operating rules:
 
 - Branch: `fix/briefing-logic-v2`
 - Base commit: `107103b7520437ab9bacd4c76ed669feaa93f613`
-- Final-remediation starting tip: `43e0696a32f8968125d8afb58a8d37bbde9c0614`
+- Latest verified feature commit: `1758fde0caca0434051ccc452fd1c926657d652a`
 
 ## Scope
 
 The branch keeps cron, Telegram, Google Drive, and `.env` unchanged.
-The work focuses on the briefing selection pipeline, weekly universe safety, and review evidence.
+The work focuses on the briefing selection pipeline, weekly universe safety, live positive-path validation, and review evidence.
+Validation status: `64/64` tests passed. Live positive path: PASS with the latest isolated live refresh completing at KR `79.2%` and US `91.9%` coverage.
 
 ## Changed Files and Roles
 
@@ -203,18 +204,18 @@ Market-specific behavior:
 - The VCS threshold wording is now consistent at 45.
 - Windows-only `install.cmd` is removed from the Linux server review path.
 
-## Still Unverified
+## Residual Risk
 
-- Fresh production weekly universe refresh is not yet validated on live network data in this workspace.
-- Current local state still has no weekly current cache, so the present dry-run is fail-closed and practical count is 0.
-- Positive-path practical recommendations and cross-output ordering are covered by a frozen E2E fixture and a builder-level fixture using real temporary files, but not by a live fresh-cache production run in this workspace.
+- The live fresh weekly-universe positive path is now validated in isolated output with KR `79.2%` and US `91.9%` coverage.
+- The daily dry-run consumed that fresh snapshot and kept practical count at `0` without backfilling observation rows.
+- Remaining risks are the `ANALYSIS_READY_LIQUIDITY_RATIO=0.5` heuristic, Yahoo provider fragility, and the daily leadership label / product wording follow-up.
 
 ## Main Merge Checklist
 
-Before any merge to `main`:
+Before any future merge to `main`:
 
-1. Verify fresh weekly universe creation on live network once.
-2. Re-run `scripts/run_daily_briefing.sh --market us`, `kr`, and `both`.
+1. Keep the fresh weekly universe positive path evidence above green.
+2. Re-run `scripts/run_daily_briefing.sh --market us`, `kr`, and `both` only if code changes again.
 3. Confirm Telegram and Drive attachments still match the canonical selector.
 4. Confirm no stale/fallback leadership leaks into practical Top lists.
 5. Confirm no uncommitted changes remain.

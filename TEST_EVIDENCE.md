@@ -11,7 +11,7 @@ bash -n scripts/run_daily_briefing.sh
 git diff --check origin/main...HEAD
 ```
 
-Current result: 55 tests passed. Bash syntax, Python compilation, and diff whitespace checks passed. Final verification is rerun immediately before commit.
+Current result: 64 tests passed. Bash syntax, Python compilation, and diff whitespace checks passed. Final verification is rerun immediately before commit.
 
 ## Test Inventory
 
@@ -24,6 +24,8 @@ Current result: 55 tests passed. Bash syntax, Python compilation, and diff white
 - `test_semiconductor_customer_mention_is_not_direct`
 - `test_data_center_customer_mention_is_not_ai_direct`
 - `test_logistics_for_chipmakers_requires_review`
+- `test_us_common_stock_name_filters_non_common_listings`
+- `test_kr_common_stock_name_filters_special_listings`
 - `test_future_release_date_fails_closed`
 - `test_same_day_future_release_time_fails_closed`
 - `test_quarter_after_release_date_fails_closed`
@@ -73,6 +75,13 @@ Current result: 55 tests passed. Bash syntax, Python compilation, and diff white
 
 ### Refresh provenance and transaction safety
 
+- `test_invalid_crumb_retry_uses_fresh_session`
+- `test_unknown_failure_is_classified_as_unknown_error`
+- `test_liquidity_failure_classifier_maps_common_yfinance_messages`
+- `test_liquidity_rows_retries_invalid_crumb_with_fresh_session`
+- `test_failed_symbol_reason_aggregation_is_attached`
+- `test_permanent_missing_symbols_do_not_count_against_analyzable_coverage`
+- `test_transient_missing_symbols_still_block_publish`
 - `test_full_fetch_failure_preserves_existing_cache`
 - `test_zero_results_preserve_existing_cache`
 - `test_low_coverage_preserves_existing_cache`
@@ -94,9 +103,19 @@ Current result: 55 tests passed. Bash syntax, Python compilation, and diff white
 - Exact source allowlisting rejects lookalikes such as `unofficial` and `secondary estimate`.
 - Frozen practical symbols `MTSI`, `SMTC`, `LSCC` appear in identical Markdown, Telegram, and TV-main order. Observation symbols are disjoint, and zero practical rows do not backfill Telegram Top.
 - Builder-level fixture coverage uses real temporary files and the same canonical selector reaches Markdown, Telegram, and TradingView main outputs.
+- The latest isolated live refresh reached KR `79.2%` and US `91.9%` coverage, produced a fresh weekly snapshot, and the daily dry-run consumed that snapshot without backfilling observation rows.
 
-## Network Attempt
+## Live Positive Path
 
-One live `--market both` weekly refresh was attempted. The process produced no upstream response within the bounded run and was terminated. No current cache, daily watchlist, or lingering process was created. This is recorded as an unverified production-positive path, not a successful refresh.
+One isolated live `--market both` weekly refresh completed successfully. It produced fresh weekly-universe output without touching the operational cache, and the following dry-run consumed that fresh snapshot:
+
+- KR coverage: `79.2%`
+- US coverage: `91.9%`
+- Fresh snapshot: generated
+- Practical count: `0`
+- Observation backfill: none
+- Telegram: skipped
+- Google Drive: skipped
+- Operational cache: unchanged
 
 No Windows-only install path, credential, `.env`, Telegram identifier, rclone configuration, or operational result is part of this evidence.

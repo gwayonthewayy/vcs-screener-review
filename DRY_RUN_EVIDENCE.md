@@ -16,20 +16,15 @@ The briefing builders call `candidate_enrichment_v2.prepare_candidates()`, which
 
 ## Weekly Universe State
 
-At verification time these operational files are absent:
+The live isolated refresh produced fresh weekly-universe files in temporary output only. The operational cache remained unchanged.
 
-- `universes/kr_liquid_current.csv`
-- `universes/us_liquid_current.csv`
-- `watchlists/kr_daily_current.txt`
-- `watchlists/us_daily_current.txt`
-
-One bounded live refresh attempt was made:
+One isolated live refresh and follow-up dry-run were made:
 
 ```bash
-.venv/bin/python scripts/refresh_weekly_universe.py --market both
+.venv/bin/python scripts/refresh_weekly_universe.py --market both --output-dir /tmp/vcs-live-XXXXXX/universes --watchlist-dir /tmp/vcs-live-XXXXXX/watchlists
 ```
 
-The upstream request did not produce a usable response before termination. The process was stopped, no files were published, and no background process remained. Therefore no claim of live fresh production validation is made.
+The isolated run completed with KR coverage `79.2%` and US coverage `91.9%`. Fresh weekly snapshot files were generated in the temporary directory, the follow-up dry-run consumed that fresh snapshot, and the operational cache stayed unchanged. Telegram and Google Drive were not invoked.
 
 ## Frozen Positive E2E Fixture
 
@@ -77,6 +72,6 @@ Observation fixtures include high-risk biotech and below-EMA21 RS cases. The Tra
 - Theme-only semiconductor hint: review-only, not direct.
 - Customer-only business phrasing: review-only, not direct.
 
-## Remaining Production Limitation
+## Remaining Production Risk
 
-A real fresh weekly universe and live positive KR/US/both production run are still unverified because the bounded upstream refresh did not complete. The frozen fixture proves the deterministic positive code path; it does not substitute for live provider availability or data-quality validation.
+The live positive path is now verified. Remaining risk is operational rather than functional: the `ANALYSIS_READY_LIQUIDITY_RATIO=0.5` heuristic, Yahoo provider fragility, and the daily leadership label / product wording follow-up still need periodic review.
