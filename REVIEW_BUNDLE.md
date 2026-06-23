@@ -33,13 +33,13 @@ Key operating rules:
 
 - Branch: `fix/briefing-logic-v2`
 - Base commit: `107103b7520437ab9bacd4c76ed669feaa93f613`
-- Latest verified feature commit: `1758fde0caca0434051ccc452fd1c926657d652a`
+- Prior remediation tip: `1758fde0caca0434051ccc452fd1c926657d652a`
+- Final feature tip: `4c27f2e38e1261ffc70f27637b26930d1205e8b0`
 
 ## Scope
 
 The branch keeps cron, Telegram, Google Drive, and `.env` unchanged.
-The work focuses on the briefing selection pipeline, weekly universe safety, live positive-path validation, and review evidence.
-Validation status: `64/64` tests passed. Live positive path: PASS with the latest isolated live refresh completing at KR `79.2%` and US `91.9%` coverage.
+The work focuses on the briefing selection pipeline, weekly universe safety, and review evidence.
 
 ## Changed Files and Roles
 
@@ -202,20 +202,21 @@ Market-specific behavior:
 - Future earnings releases fail closed, exact source-type allowlisting rejects substring lookalikes, and customer-only theme labels cannot independently create direct business classification.
 - KR fresh scope now renders the full-market title using the canonical fresh constant.
 - The VCS threshold wording is now consistent at 45.
+- The analysis-ready coverage denominator is pinned by `ANALYSIS_READY_LIQUIDITY_RATIO=0.5`, and the boundary regression now covers below/at/above-half-threshold behavior.
 - Windows-only `install.cmd` is removed from the Linux server review path.
 
-## Residual Risk
+## Residual Risks
 
-- The live fresh weekly-universe positive path is now validated in isolated output with KR `79.2%` and US `91.9%` coverage.
-- The daily dry-run consumed that fresh snapshot and kept practical count at `0` without backfilling observation rows.
-- Remaining risks are the `ANALYSIS_READY_LIQUIDITY_RATIO=0.5` heuristic, Yahoo provider fragility, and the daily leadership label / product wording follow-up.
+- `ANALYSIS_READY_LIQUIDITY_RATIO=0.5` remains a heuristic, but it is now pinned by a boundary regression.
+- Yahoo provider fragility remains a live dependency.
+- Daily leadership label/product wording follow-up remains.
 
 ## Main Merge Checklist
 
-Before any future merge to `main`:
+Before any merge to `main`:
 
-1. Keep the fresh weekly universe positive path evidence above green.
-2. Re-run `scripts/run_daily_briefing.sh --market us`, `kr`, and `both` only if code changes again.
+1. Verify fresh weekly universe creation on live network once.
+2. Re-run `scripts/run_daily_briefing.sh --market us`, `kr`, and `both`.
 3. Confirm Telegram and Drive attachments still match the canonical selector.
 4. Confirm no stale/fallback leadership leaks into practical Top lists.
 5. Confirm no uncommitted changes remain.

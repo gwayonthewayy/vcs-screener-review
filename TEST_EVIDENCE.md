@@ -11,7 +11,7 @@ bash -n scripts/run_daily_briefing.sh
 git diff --check origin/main...HEAD
 ```
 
-Current result: 64 tests passed. Bash syntax, Python compilation, and diff whitespace checks passed. Final verification is rerun immediately before commit.
+Current result: 65 tests passed. Bash syntax, Python compilation, and diff whitespace checks passed. Final verification is rerun immediately before commit.
 
 ## Test Inventory
 
@@ -24,8 +24,6 @@ Current result: 64 tests passed. Bash syntax, Python compilation, and diff white
 - `test_semiconductor_customer_mention_is_not_direct`
 - `test_data_center_customer_mention_is_not_ai_direct`
 - `test_logistics_for_chipmakers_requires_review`
-- `test_us_common_stock_name_filters_non_common_listings`
-- `test_kr_common_stock_name_filters_special_listings`
 - `test_future_release_date_fails_closed`
 - `test_same_day_future_release_time_fails_closed`
 - `test_quarter_after_release_date_fails_closed`
@@ -53,6 +51,7 @@ Current result: 64 tests passed. Bash syntax, Python compilation, and diff white
 - `test_main_and_observation_tv_files_are_disjoint`
 - `test_fresh_positive_fixture_has_identical_markdown_telegram_and_tv_order`
 - `test_builder_level_fresh_positive_fixture_keeps_order_and_disjoint_outputs`
+- `test_analysis_ready_liquidity_ratio_boundary_counts_exactly_at_half_threshold`
 - `test_zero_practical_candidates_do_not_backfill_telegram_top`
 
 ### Weekly cache validation
@@ -75,13 +74,6 @@ Current result: 64 tests passed. Bash syntax, Python compilation, and diff white
 
 ### Refresh provenance and transaction safety
 
-- `test_invalid_crumb_retry_uses_fresh_session`
-- `test_unknown_failure_is_classified_as_unknown_error`
-- `test_liquidity_failure_classifier_maps_common_yfinance_messages`
-- `test_liquidity_rows_retries_invalid_crumb_with_fresh_session`
-- `test_failed_symbol_reason_aggregation_is_attached`
-- `test_permanent_missing_symbols_do_not_count_against_analyzable_coverage`
-- `test_transient_missing_symbols_still_block_publish`
 - `test_full_fetch_failure_preserves_existing_cache`
 - `test_zero_results_preserve_existing_cache`
 - `test_low_coverage_preserves_existing_cache`
@@ -102,20 +94,13 @@ Current result: 64 tests passed. Bash syntax, Python compilation, and diff white
 - Future earnings, including a later timestamp on the same UTC date, are `distorted_or_missing`, unverified, and retain a negative age for diagnostics.
 - Exact source allowlisting rejects lookalikes such as `unofficial` and `secondary estimate`.
 - Frozen practical symbols `MTSI`, `SMTC`, `LSCC` appear in identical Markdown, Telegram, and TV-main order. Observation symbols are disjoint, and zero practical rows do not backfill Telegram Top.
+- The analysis-ready coverage boundary fixture keeps `average_dollar_volume_20d` values just below, exactly at, and above `0.5 * final_threshold`, proving that only the exact half-threshold and above count into the analysis-ready denominator.
 - Builder-level fixture coverage uses real temporary files and the same canonical selector reaches Markdown, Telegram, and TradingView main outputs.
-- The latest isolated live refresh reached KR `79.2%` and US `91.9%` coverage, produced a fresh weekly snapshot, and the daily dry-run consumed that snapshot without backfilling observation rows.
 
 ## Live Positive Path
 
-One isolated live `--market both` weekly refresh completed successfully. It produced fresh weekly-universe output without touching the operational cache, and the following dry-run consumed that fresh snapshot:
+The live isolated positive path is now verified. KR coverage reached `79.2%`, US coverage reached `91.9%`, a fresh weekly snapshot was generated, daily dry-run consumed the fresh weekly watchlist, practical recommendations stayed at `0`, observation did not backfill practical, Telegram/Drive delivery was skipped, and operational cache remained unchanged.
 
-- KR coverage: `79.2%`
-- US coverage: `91.9%`
-- Fresh snapshot: generated
-- Practical count: `0`
-- Observation backfill: none
-- Telegram: skipped
-- Google Drive: skipped
-- Operational cache: unchanged
+The new boundary regression was added after this live PASS so the analysis-ready denominator heuristic stays pinned.
 
 No Windows-only install path, credential, `.env`, Telegram identifier, rclone configuration, or operational result is part of this evidence.

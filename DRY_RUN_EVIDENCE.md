@@ -2,7 +2,7 @@
 
 ## Scope
 
-The final remediation verification does not invoke Telegram or Google Drive delivery. Cron, `.env`, and delivery configuration remain unchanged.
+The live positive-path verification did not invoke Telegram or Google Drive delivery. Cron, `.env`, and delivery configuration remain unchanged.
 
 ## Production Entry-Point Call Flow
 
@@ -16,15 +16,16 @@ The briefing builders call `candidate_enrichment_v2.prepare_candidates()`, which
 
 ## Weekly Universe State
 
-The live isolated refresh produced fresh weekly-universe files in temporary output only. The operational cache remained unchanged.
+At verification time these operational files are absent:
 
-One isolated live refresh and follow-up dry-run were made:
+- `universes/kr_liquid_current.csv`
+- `universes/us_liquid_current.csv`
+- `watchlists/kr_daily_current.txt`
+- `watchlists/us_daily_current.txt`
 
-```bash
-.venv/bin/python scripts/refresh_weekly_universe.py --market both --output-dir /tmp/vcs-live-XXXXXX/universes --watchlist-dir /tmp/vcs-live-XXXXXX/watchlists
-```
+The live positive path was verified in isolated temp output. The weekly refresh generated a fresh snapshot, daily dry-run consumed it, and no operational cache or delivery target was modified. Telegram and Drive remained no-send.
 
-The isolated run completed with KR coverage `79.2%` and US coverage `91.9%`. Fresh weekly snapshot files were generated in the temporary directory, the follow-up dry-run consumed that fresh snapshot, and the operational cache stayed unchanged. Telegram and Google Drive were not invoked.
+The boundary follow-up regression was added after this live PASS to pin the analysis-ready denominator heuristic.
 
 ## Frozen Positive E2E Fixture
 
@@ -72,6 +73,6 @@ Observation fixtures include high-risk biotech and below-EMA21 RS cases. The Tra
 - Theme-only semiconductor hint: review-only, not direct.
 - Customer-only business phrasing: review-only, not direct.
 
-## Remaining Production Risk
+## Remaining Production Limitation
 
-The live positive path is now verified. Remaining risk is operational rather than functional: the `ANALYSIS_READY_LIQUIDITY_RATIO=0.5` heuristic, Yahoo provider fragility, and the daily leadership label / product wording follow-up still need periodic review.
+A fresh weekly universe and live positive KR/US/both production run is now verified in isolated temp output with operational cache unchanged. The frozen fixture still proves the deterministic positive code path, and the follow-up boundary regression now protects the analysis-ready denominator heuristic.

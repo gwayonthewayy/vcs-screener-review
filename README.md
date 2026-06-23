@@ -7,7 +7,7 @@ This public repository contains a review-only bundle for a private project. It i
 - Base branch: `main`
 - Base commit: `107103b7520437ab9bacd4c76ed669feaa93f613`
 - Feature branch: `fix/briefing-logic-v2`
-- Feature commit: `1758fde0caca0434051ccc452fd1c926657d652a`
+- Feature commit: `4c27f2e38e1261ffc70f27637b26930d1205e8b0`
 - Generated: 2026-06-23
 
 ## Files
@@ -27,4 +27,4 @@ The bundle intentionally excludes `.env`, credentials, Telegram identifiers, rcl
 
 ## Important limitation
 
-Live positive path: PASS. The latest live isolated refresh completed with fresh weekly-universe coverage of KR `79.2%` and US `91.9%`. The daily dry-run consumed that fresh snapshot, practical recommendations remained zero, observation did not backfill practical, operational cache stayed unchanged, and Telegram/Drive delivery was skipped. Remaining review risks are the `ANALYSIS_READY_LIQUIDITY_RATIO=0.5` heuristic, Yahoo provider fragility, and the daily leadership label / product wording follow-up.
+The latest validation reached the live fresh weekly-universe positive path: KR coverage was `79.2%`, US coverage was `91.9%`, practical recommendations stayed at zero, and operational cache remained unchanged. A small analysis-ready coverage boundary regression was added afterward and is included in this bundle.

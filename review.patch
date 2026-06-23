@@ -4785,10 +4785,10 @@ index 0000000..8c379db
 +    unittest.main()
 diff --git a/tests/test_weekly_universe_refresh.py b/tests/test_weekly_universe_refresh.py
 new file mode 100644
-index 0000000..d96b1a3
+index 0000000..dd90ec8
 --- /dev/null
 +++ b/tests/test_weekly_universe_refresh.py
-@@ -0,0 +1,565 @@
+@@ -0,0 +1,627 @@
 +from __future__ import annotations
 +
 +import os
@@ -4891,6 +4891,68 @@ index 0000000..d96b1a3
 +
 +
 +class WeeklyUniverseRefreshTests(unittest.TestCase):
++    def test_analysis_ready_liquidity_ratio_boundary_counts_exactly_at_half_threshold(self) -> None:
++        with TemporaryDirectory() as tmp:
++            root = Path(tmp)
++            output_dir = root / "universes"
++            watchlist_dir = root / "watchlists"
++
++            universe = pd.DataFrame(
++                [
++                    {"market": "KR", "symbol": "000001.KS", "stock_name": "Low", "sector": "Technology"},
++                    {"market": "KR", "symbol": "000002.KS", "stock_name": "Exact", "sector": "Technology"},
++                    {"market": "KR", "symbol": "000003.KS", "stock_name": "High", "sector": "Technology"},
++                ]
++            )
++            universe.attrs["source_provenance"] = source_provenance("KR")
++
++            liquidity = pd.DataFrame(
++                [
++                    {
++                        "symbol": "000001.KS",
++                        "close": 1_000.0,
++                        "average_dollar_volume_20d": 49.9,
++                        "liquidity_observations": 20,
++                    },
++                    {
++                        "symbol": "000002.KS",
++                        "close": 1_000.0,
++                        "average_dollar_volume_20d": 50.0,
++                        "liquidity_observations": 20,
++                    },
++                    {
++                        "symbol": "000003.KS",
++                        "close": 1_000.0,
++                        "average_dollar_volume_20d": 120.0,
++                        "liquidity_observations": 20,
++                    },
++                ]
++            )
++
++            result = refresh.write_market_with_loader(
++                "KR",
++                universe,
++                output_dir,
++                watchlist_dir,
++                "20260623",
++                100.0,
++                1_000.0,
++                5,
++                1,
++                min_symbols=1,
++                min_coverage_pct=50.0,
++                liquidity_source=lambda symbols, chunk_size: liquidity,
++            )
++
++            self.assertTrue(result["ok"])
++            self.assertEqual(result["source_universe_size"], 3)
++            self.assertEqual(result["universe_size"], 2)
++            self.assertEqual(result["effective_universe_size"], 2)
++            self.assertEqual(result["liquid_size"], 1)
++            self.assertEqual(result["coverage_pct"], 50.0)
++            self.assertTrue((output_dir / "kr_liquid_current.csv").exists())
++            self.assertTrue((watchlist_dir / "kr_daily_current.txt").exists())
++
 +    def test_kr_partial_source_failure_preserves_existing_cache(self) -> None:
 +        with TemporaryDirectory() as tmp:
 +            root = Path(tmp)
